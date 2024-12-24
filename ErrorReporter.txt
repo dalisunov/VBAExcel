@@ -1,0 +1,502 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "ErrorReporter"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
+' Component: ErrorReporter
+
+Option Explicit
+
+' ------------------------------------------------------------------
+' # Структуры данных для хранения информации об ошибке
+' ------------------------------------------------------------------
+
+Private Type TErrorInfo
+    ErrorTime As Date
+    ErrorNumber As Long
+    ErrorLevel As String
+    ErrorCategory As String
+    ErrorMessageBase As String
+    ErrorMessageUser As String
+    ErrorRecommendation As String
+    ErrorLineNumber As Long
+    ErrorLineText As String
+    ErrorObject As String
+    ModuleName As String
+    ProgramName As String
+End Type
+
+Private Type TErrorReporter
+    BaseManager As BaseManager
+    ErrorInfo As TErrorInfo
+    JsonData As Scripting.Dictionary
+    IsVBEAvailable As Boolean
+End Type
+
+' ------------------------------------------------------------------
+' # Объект класса
+' ------------------------------------------------------------------
+
+Private this As TErrorReporter
+Private Const ERROR_CACHE_KEY As String = "ErrorCache"
+
+' ------------------------------------------------------------------
+' # События
+' ------------------------------------------------------------------
+
+Public Event OnErrorProcessed(ByVal ErrorInfo As String)
+Public Event OnReportGenerated(ByVal reportPath As String)
+
+' ------------------------------------------------------------------
+' # Инициализация класса
+' ------------------------------------------------------------------
+
+Private Sub Class_Initialize()
+    Set this.BaseManager = New BaseManager
+    Set this.JsonData = New Scripting.Dictionary
+    
+    ' Проверка доступности VBE
+    On Error Resume Next
+    Dim dummy As Object
+    Set dummy = Application.VBE
+    this.IsVBEAvailable = (Err.Number = 0)
+    On Error GoTo 0
+    
+    ' Загрузка определений ошибок из JSON
+    LoadErrorDefinitions
+End Sub
+
+Private Sub Class_Terminate()
+    Set this.BaseManager = Nothing
+    Set this.JsonData = Nothing
+End Sub
+
+' ------------------------------------------------------------------
+' # Обработка ошибки
+' ------------------------------------------------------------------
+
+Public Sub ProcessError(ByVal ErrorNumber As Long)
+    ' Получение деталей ошибки
+    GetErrorDetails ErrorNumber
+    
+    ' Получение местоположения ошибки
+    If this.IsVBEAvailable Then
+        GetErrorLocation
+    End If
+    
+    ' Сохранение информации об ошибке в кэш
+    CacheErrorInfo
+    
+    ' Генерация отчета об ошибке
+    GenerateErrorReport
+    
+    ' Вывод обработанной информации об ошибке
+    RaiseEvent OnErrorProcessed(GetErrorSummary())
+End Sub
+
+' ------------------------------------------------------------------
+' # Получение деталей ошибки из JSON
+' ------------------------------------------------------------------
+
+Private Sub GetErrorDetails(ByVal ErrorNumber As Long)
+    If this.JsonData.exists(CStr(ErrorNumber)) Then
+        With this.ErrorInfo
+            .ErrorTime = Now
+            .ErrorNumber = ErrorNumber
+            .ErrorLevel = this.JsonData(CStr(ErrorNumber))("Level")
+            .ErrorCategory = this.JsonData(CStr(ErrorNumber))("Category")
+            .ErrorMessageBase = this.JsonData(CStr(ErrorNumber))("ErrorOriginalMessage")
+            .ErrorMessageUser = this.JsonData(CStr(ErrorNumber))("ErrorMessage")
+            .ErrorRecommendation = this.JsonData(CStr(ErrorNumber))("ErrorRecommendation")
+        End With
+    Else
+        ' Если ошибка не определена в JSON
+        With this.ErrorInfo
+            .ErrorTime = Now
+            .ErrorNumber = ErrorNumber
+            .ErrorLevel = "Unknown"
+            .ErrorCategory = "Undefined"
+            .ErrorMessageBase = "Unknown error"
+            .ErrorMessageUser = "An unexpected error occurred"
+            .ErrorRecommendation = "Contact system administrator"
+        End With
+    End If
+End Sub
+
+' ------------------------------------------------------------------
+' # Получение местоположения ошибки через VBE
+' ------------------------------------------------------------------
+
+Private Sub GetErrorLocation()
+    On Error Resume Next
+    
+    Dim CodePane As Object
+    Set CodePane = Application.VBE.ActiveCodePane
+    
+    If Not CodePane Is Nothing Then
+        With this.ErrorInfo
+            .ErrorLineNumber = CodePane.GetSelection()(1)
+            .ErrorLineText = CodePane.CodeModule.lines(.ErrorLineNumber, 1)
+            .ModuleName = CodePane.CodeModule.Name
+            .ProgramName = Application.Name
+        End With
+    End If
+    
+    On Error GoTo 0
+End Sub
+
+' ------------------------------------------------------------------
+' # Кэширование информации об ошибке
+' ------------------------------------------------------------------
+
+Private Sub CacheErrorInfo()
+    Dim ErrorCache As Collection
+    
+    ' Получение существующего кэша или создание нового
+    If Not IsEmpty(this.BaseManager.GetFromCache(ERROR_CACHE_KEY)) Then
+        Set ErrorCache = this.BaseManager.GetFromCache(ERROR_CACHE_KEY)
+    Else
+        Set ErrorCache = New Collection
+    End If
+    
+    ' Добавление новой ошибки в кэш
+    ErrorCache.Add GetErrorInfoDictionary()
+    
+    ' Обновление кэша через BaseManager
+    this.BaseManager.UpdateCache ERROR_CACHE_KEY, ErrorCache
+End Sub
+
+' ------------------------------------------------------------------
+' # Получение информации об ошибке в виде словаря
+' ------------------------------------------------------------------
+
+Private Function GetErrorInfoDictionary() As Scripting.Dictionary
+    Dim Dict As New Scripting.Dictionary
+    
+    With this.ErrorInfo
+        Dict.Add "ErrorTime", Format(.ErrorTime, "dd.mm.yyyy hh:mm:ss")
+        Dict.Add "ErrorCode", .ErrorNumber
+        Dict.Add "ErrorLevel", .ErrorLevel
+        Dict.Add "ErrorCategory", .ErrorCategory
+        Dict.Add "ErrorMessage", .ErrorMessageUser
+        Dict.Add "ErrorOriginalMessage", .ErrorMessageBase
+        Dict.Add "ErrorRecommendation", .ErrorRecommendation
+        Dict.Add "ErrorLineNumber", .ErrorLineNumber
+        Dict.Add "ErrorLineText", .ErrorLineText
+        Dict.Add "ErrorObject", .ErrorObject
+        Dict.Add "ModuleName", .ModuleName
+        Dict.Add "ProgramName", .ProgramName
+    End With
+    
+    Set GetErrorInfoDictionary = Dict
+End Function
+
+' ------------------------------------------------------------------
+' # Генерация отчета об ошибке
+' ------------------------------------------------------------------
+
+Private Sub GenerateErrorReport()
+    ' Получение текстового отчета
+    Dim ReportText As String
+    ReportText = String(50, "-") & vbNewLine
+    ReportText = ReportText & "Отчет об ошибке" & vbNewLine
+    ReportText = ReportText & String(50, "-") & vbNewLine
+    ReportText = ReportText & GetErrorSummary()
+    
+    ' Экспорт в Excel и текстовый файл
+    ExportToExcel ReportText
+    ExportToText ReportText
+    
+    ' Генерация события о создании отчета
+    RaiseEvent OnReportGenerated(GetReportPath())
+End Sub
+
+' ------------------------------------------------------------------
+' # Получение сводной информации об ошибке
+' ------------------------------------------------------------------
+
+'Private Function GetErrorSummary() As String
+'    Dim Summary As String
+'    With this.ErrorInfo
+'        Summary = "Время ошибки: " & .ErrorTime & vbCrLf
+'        Summary = Summary & "Номер ошибки: " & .ErrorNumber & vbCrLf
+'        Summary = Summary & "Уровень ошибки: " & .ErrorLevel & vbCrLf
+'        Summary = Summary & "Категория ошибки: " & .ErrorCategory & vbCrLf
+'        Summary = Summary & "Сообщение ошибки: " & .ErrorMessageUser & vbCrLf
+'        Summary = Summary & "Рекомендация: " & .ErrorRecommendation & vbCrLf
+'
+'        If this.IsVBEAvailable Then
+'            Summary = Summary & "Модуль: " & .ModuleName & vbCrLf
+'            Summary = Summary & "Номер строки: " & .ErrorLineNumber & vbCrLf
+'            Summary = Summary & "Текст строки: " & .ErrorLineText & vbCrLf
+'        End If
+'    End With
+'    GetErrorSummary = Summary
+'End Function
+
+' ------------------------------------------------------------------
+' # Экспорт отчета в Excel
+' ------------------------------------------------------------------
+
+Private Sub ExportToExcel(ByVal ReportText As String)
+    On Error GoTo ErrorHandler
+    
+    ' Создание нового рабочего листа
+    Dim wb As Workbook
+    Set wb = Application.Workbooks.Add
+    
+    Dim ws As Worksheet
+    Set ws = wb.Sheets(1)
+    ws.Name = "Error Report " & Format(Now, "yyyy-mm-dd_hh-mm-ss")
+    
+    ' Заполнение отчета
+    With ws
+        .Range("A1:G1").Merge
+        .Range("A1").Value = "Отчет об ошибке"
+        .Range("A1").Font.Bold = True
+        .Range("A1").HorizontalAlignment = xlCenter
+        
+        Dim row As Long
+        row = 3
+        
+        ' Запись информации из ErrorInfo
+        With this.ErrorInfo
+            .ErrorTime = Now ' Пример заполнения (можно убрать, если уже заполнено)
+            
+            ws.Cells(row, 1).Value = "Время ошибки:"
+            ws.Cells(row, 2).Value = Format(.ErrorTime, "dd.mm.yyyy hh:mm:ss")
+            row = row + 1
+            
+            ws.Cells(row, 1).Value = "Номер ошибки:"
+            ws.Cells(row, 2).Value = .ErrorNumber
+            row = row + 1
+            
+            ws.Cells(row, 1).Value = "Уровень ошибки:"
+            ws.Cells(row, 2).Value = .ErrorLevel
+            row = row + 1
+            
+            ws.Cells(row, 1).Value = "Категория ошибки:"
+            ws.Cells(row, 2).Value = .ErrorCategory
+            row = row + 1
+            
+            ws.Cells(row, 1).Value = "Сообщение ошибки:"
+            ws.Cells(row, 2).Value = .ErrorMessageUser
+            row = row + 1
+            
+            ws.Cells(row, 1).Value = "Рекомендация:"
+            ws.Cells(row, 2).Value = .ErrorRecommendation
+            row = row + 1
+            
+            If this.IsVBEAvailable Then
+                ws.Cells(row, 1).Value = "Модуль:"
+                ws.Cells(row, 2).Value = .ModuleName
+                row = row + 1
+                
+                ws.Cells(row, 1).Value = "Номер строки:"
+                ws.Cells(row, 2).Value = .ErrorLineNumber
+                row = row + 1
+                
+                ws.Cells(row, 1).Value = "Текст строки:"
+                ws.Cells(row, 2).Value = .ErrorLineText
+            End If
+        End With
+        
+        ' Форматирование
+        .Columns("A:B").AutoFit
+    End With
+    
+    ' Сохранение отчета
+    Dim filePath As String
+    filePath = GetReportPath()
+    filePath = Replace(filePath, ".txt", ".xlsx")
+    wb.SaveAs filePath
+    wb.Close SaveChanges:=False
+    
+    ' Логирование успешного экспорта
+    this.BaseManager.LogInfo "Отчет об ошибке экспортирован в Excel: " & filePath
+    Exit Sub
+    
+ErrorHandler:
+    this.BaseManager.LogError "Ошибка при экспорте в Excel: " & Err.Description
+End Sub
+
+' ------------------------------------------------------------------
+' # Экспорт отчета в текстовый файл
+' ------------------------------------------------------------------
+
+Private Sub ExportToText(ByVal ReportText As String)
+    On Error GoTo ErrorHandler
+    
+    ' Использование FolderUtils для получения пути к папке отчетов
+    Dim folderPath As String
+    folderPath = GetReportFolderPath()
+    
+    ' Проверка существования папки, создание при необходимости
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    
+    If Not fso.FolderExists(folderPath) Then
+        fso.CreateFolder folderPath
+    End If
+    
+    ' Создание и запись в файл
+    Dim TextFile As Object
+    Set TextFile = fso.CreateTextFile(GetReportPath(), True)
+    TextFile.Write ReportText
+    TextFile.Close
+    
+    ' Логирование успешного экспорта
+    this.BaseManager.LogInfo "Отчет об ошибке экспортирован в текстовый файл: " & GetReportPath()
+    Exit Sub
+    
+ErrorHandler:
+    this.BaseManager.LogError "Ошибка при экспорте в текстовый файл: " & Err.Description
+End Sub
+
+' ------------------------------------------------------------------
+' # Получение пути к папке отчетов
+' ------------------------------------------------------------------
+
+Private Function GetReportFolderPath() As String
+    Dim appPath As String
+    appPath = FolderUtils.GetCurrentWorkbookPath()
+    GetReportFolderPath = appPath & "\ErrorReports"
+End Function
+
+' ------------------------------------------------------------------
+' # Получение пути к отчету
+' ------------------------------------------------------------------
+
+Private Function GetReportPath() As String
+    Dim folderPath As String
+    folderPath = GetReportFolderPath()
+    
+    Dim fileName As String
+    fileName = "ErrorReport_" & Format(Now, "yyyymmdd_hhmmss") & "_" & this.ErrorInfo.ErrorNumber & ".txt"
+    
+    GetReportPath = folderPath & "\" & fileName
+End Function
+
+' ------------------------------------------------------------------
+' # Получение сводной информации об ошибке
+' ------------------------------------------------------------------
+
+Private Function GetErrorSummary() As String
+    Dim summary As String
+    With this.ErrorInfo
+        summary = "Время ошибки: " & Format(.ErrorTime, "dd.mm.yyyy hh:mm:ss") & vbCrLf
+        summary = summary & "Номер ошибки: " & .ErrorNumber & vbCrLf
+        summary = summary & "Уровень ошибки: " & .ErrorLevel & vbCrLf
+        summary = summary & "Категория ошибки: " & .ErrorCategory & vbCrLf
+        summary = summary & "Сообщение ошибки: " & .ErrorMessageUser & vbCrLf
+        summary = summary & "Рекомендация: " & .ErrorRecommendation & vbCrLf
+        
+        If this.IsVBEAvailable Then
+            summary = summary & "Модуль: " & .ModuleName & vbCrLf
+            summary = summary & "Номер строки: " & .ErrorLineNumber & vbCrLf
+            summary = summary & "Текст строки: " & .ErrorLineText & vbCrLf
+        End If
+    End With
+    GetErrorSummary = summary
+End Function
+
+' ------------------------------------------------------------------
+' # Загрузка определений ошибок из JSON
+' ------------------------------------------------------------------
+
+Private Sub LoadErrorDefinitions()
+    On Error GoTo ErrorHandler
+    
+    ' Загрузка JSON файла
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    
+    Dim JsonFile As Object
+    Set JsonFile = fso.OpenTextFile("errors.json", 1) ' ForReading = 1
+    Dim JsonText As String
+    JsonText = JsonFile.ReadAll
+    JsonFile.Close
+    
+    ' Парсинг JSON
+    Dim JsonArray As Object
+    Set JsonArray = ParseJson(JsonText)
+    
+    ' Заполнение словаря ошибок
+    Dim item As Object
+    For Each item In JsonArray
+        Dim ErrorDict As Scripting.Dictionary
+        Set ErrorDict = New Scripting.Dictionary
+        
+        ErrorDict.Add "Level", item("ErrorLevel")
+        ErrorDict.Add "Category", item("ErrorCategory")
+        ErrorDict.Add "ErrorOriginalMessage", item("ErrorOriginalMessage")
+        ErrorDict.Add "ErrorMessage", item("ErrorMessage")
+        ErrorDict.Add "ErrorRecommendation", item("ErrorRecommendation")
+        
+        this.JsonData.Add CStr(item("ErrorCode")), ErrorDict
+    Next item
+    
+    ' Логирование успешной загрузки
+    this.BaseManager.LogInfo "Загружено " & this.JsonData.Count & " определений ошибок из JSON."
+    Exit Sub
+
+ErrorHandler:
+    this.BaseManager.LogError "Ошибка при загрузке определений ошибок из JSON: " & Err.Description
+    ' Инициализация дефолтных ошибок при сбое загрузки JSON
+    InitializeDefaultErrors
+End Sub
+
+' ------------------------------------------------------------------
+' # Инициализация дефолтных ошибок
+' ------------------------------------------------------------------
+
+Private Sub InitializeDefaultErrors()
+    Dim BasicError As Scripting.Dictionary
+    Set BasicError = New Scripting.Dictionary
+    
+    BasicError.Add "Level", "5"
+    BasicError.Add "Category", "System Error"
+    BasicError.Add "ErrorOriginalMessage", "System error occurred"
+    BasicError.Add "ErrorMessage", "An unexpected system error has occurred."
+    BasicError.Add "ErrorRecommendation", "Please contact the system administrator."
+    
+    this.JsonData.Add "0", BasicError
+End Sub
+
+' ------------------------------------------------------------------
+' # Парсинг JSON
+' ------------------------------------------------------------------
+
+Private Function ParseJson(JsonText As String) As Object
+    ' Использование MSScriptControl для парсинга JSON
+    Dim Script As Object
+    Set Script = CreateObject("MSScriptControl.ScriptControl")
+    Script.Language = "JScript"
+    
+    ' Код для парсинга JSON
+    Script.AddCode "function ParseJson(jsonString) { return JSON.parse(jsonString); }"
+    Set ParseJson = Script.Run("ParseJson", JsonText)
+End Function
+
+' ------------------------------------------------------------------
+' # Помощники
+' ------------------------------------------------------------------
+
+Private Function EscapeJsonString(Value As String) As String
+    If Value = "" Then
+        EscapeJsonString = ""
+        Exit Function
+    End If
+    
+    Value = Replace(Value, "\", "\\")
+    Value = Replace(Value, """", "\""")
+    Value = Replace(Value, vbCrLf, "\n")
+    Value = Replace(Value, vbLf, "\n")
+    Value = Replace(Value, vbCr, "\n")
+    EscapeJsonString = Value
+End Function
+

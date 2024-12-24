@@ -1,0 +1,13 @@
+Attribute VB_Name = "ValidationTypes"
+
+' ------------------------------------------------------------------
+' # Типы данных для тестирования
+' ------------------------------------------------------------------
+Public Type TestResult
+    TestName As String
+    Value As String
+    Expected As Boolean
+    Actual As Boolean
+    ErrorMessage As String
+    Details As String
+End Type

@@ -1,0 +1,208 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "DictionaryManager"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
+Option Explicit
+
+' ------------------------------------------------------------------
+' # Объявление типов данных
+' ------------------------------------------------------------------
+
+Private Type Type_DictionaryManager
+    Dictionaries As Scripting.Dictionary
+    Dictionaries_Info As Scripting.Dictionary
+    Dictionaries_Metadata As Scripting.Dictionary
+End Type
+
+Private Type Type_Transaction
+    IsActive As Boolean
+    Changes As Collection
+End Type
+
+' ------------------------------------------------------------------
+' # Переменные класса
+' ------------------------------------------------------------------
+
+Private Manager_State As Type_DictionaryManager
+Private Transaction_State As Type_Transaction
+
+' ------------------------------------------------------------------
+' # Объявление событий
+' ------------------------------------------------------------------
+
+Public Event OnDictionaryChanged(ByVal DictionaryName As String)
+Public Event OnMetadataChanged(ByVal DictionaryName As String, ByVal Metadata As String)
+Public Event OnDictionaryInfoUpdated(ByVal DictionaryInfo As CollectionInfo)
+
+' ------------------------------------------------------------------
+' # Инициализация и завершение работы класса
+' ------------------------------------------------------------------
+
+Private Sub Class_Initialize()
+    Set Manager_State.Dictionaries = New Scripting.Dictionary
+    Set Manager_State.Dictionaries_Info = New Scripting.Dictionary
+    Set Manager_State.Dictionaries_Metadata = New Scripting.Dictionary
+    Set Transaction_State.Changes = New Collection
+    Transaction_State.IsActive = False
+End Sub
+
+Private Sub Class_Terminate()
+    Set Manager_State.Dictionaries = Nothing
+    Set Manager_State.Dictionaries_Info = Nothing
+    Set Manager_State.Dictionaries_Metadata = Nothing
+    Set Transaction_State.Changes = Nothing
+End Sub
+
+' ------------------------------------------------------------------
+' # Основные методы работы со словарями
+' ------------------------------------------------------------------
+
+' # [Function CreateDictionary] - Создание нового словаря
+Public Function CreateDictionary(ByVal DictionaryName As String) As Scripting.Dictionary
+    If Len(Trim(DictionaryName)) = 0 Then Exit Function
+
+    If Not Manager_State.Dictionaries.exists(DictionaryName) Then
+        Dim NewDictionary As New Scripting.Dictionary
+        Manager_State.Dictionaries.Add DictionaryName, NewDictionary
+        UpdateDictionaryInfo DictionaryName, NewDictionary, "Dictionary"
+        RaiseEvent OnDictionaryChanged(DictionaryName)
+        Set CreateDictionary = NewDictionary
+    End If
+End Function
+
+' # [Function AddToDictionary] - Добавление элемента в словарь
+Public Function AddToDictionary(ByVal DictionaryName As String, ByVal ItemKey As Variant, ByVal item As Variant) As Boolean
+    If Not Manager_State.Dictionaries.exists(DictionaryName) Then Exit Function
+
+    With Manager_State.Dictionaries(DictionaryName)
+        If Not .exists(ItemKey) Then
+            .Add ItemKey, item
+        End If
+    End With
+
+    UpdateDictionaryInfo DictionaryName, Manager_State.Dictionaries(DictionaryName), "Dictionary"
+    RaiseEvent OnDictionaryChanged(DictionaryName)
+    RaiseEvent OnMetadataChanged(DictionaryName, "Dictionary")
+
+    AddToDictionary = True
+End Function
+
+' # [Sub UpdateDictionaryInfo] - Обновление информации о словаре
+Private Sub UpdateDictionaryInfo(ByVal DictionaryName As String, ByVal Dictionary As Scripting.Dictionary, ByVal DictionaryType As String)
+    If DictionaryName = "" Then Exit Sub
+
+    Dim Dictionary_Info As New CollectionInfo
+    With Dictionary_Info
+        .Name = DictionaryName
+        .CollectionType = DictionaryType
+        .ItemCount = Dictionary.Count
+    End With
+
+    If Manager_State.Dictionaries_Info.exists(DictionaryName) Then
+        Manager_State.Dictionaries_Info.Remove DictionaryName
+    End If
+    Manager_State.Dictionaries_Info.Add DictionaryName, Dictionary_Info
+
+    RaiseEvent OnDictionaryInfoUpdated(Dictionary_Info)
+End Sub
+
+' # [Function GetDictionaryNames] - Получение имен всех словарей
+Public Function GetDictionaryNames() As Variant
+    GetDictionaryNames = Manager_State.Dictionaries.keys
+End Function
+
+' # [Sub ClearDictionary] - Очистка словаря
+Public Sub ClearDictionary(ByVal DictionaryName As String)
+    If Not Manager_State.Dictionaries.exists(DictionaryName) Then Exit Sub
+
+    Manager_State.Dictionaries(DictionaryName).RemoveAll
+    UpdateDictionaryInfo DictionaryName, Manager_State.Dictionaries(DictionaryName), "Dictionary"
+    RaiseEvent OnDictionaryChanged(DictionaryName)
+End Sub
+
+' # [Sub RemoveDictionary] - Удаление словаря
+Public Sub RemoveDictionary(ByVal DictionaryName As String)
+    If Manager_State.Dictionaries.exists(DictionaryName) Then
+        Manager_State.Dictionaries.Remove DictionaryName
+        Manager_State.Dictionaries_Info.Remove DictionaryName
+        RaiseEvent OnDictionaryChanged(DictionaryName)
+    End If
+End Sub
+
+' # [Function DictionaryExists] - Проверка существования словаря
+Public Function DictionaryExists(ByVal DictionaryName As String) As Boolean
+    DictionaryExists = Manager_State.Dictionaries.exists(DictionaryName)
+End Function
+
+' # [Function GetDictionaryCount] - Получение количества словарей
+Public Function GetDictionaryCount() As Long
+    GetDictionaryCount = Manager_State.Dictionaries.Count
+End Function
+
+' # [Function GetDictionaryInfo] - Получение информации о словаре
+Public Function GetDictionaryInfo(ByVal DictionaryName As String) As CollectionInfo
+    If Manager_State.Dictionaries_Info.exists(DictionaryName) Then
+        Set GetDictionaryInfo = Manager_State.Dictionaries_Info(DictionaryName)
+    End If
+End Function
+
+' # [Function GetDictionary] - Получение словаря по имени
+Public Function GetDictionary(ByVal DictionaryName As String) As Scripting.Dictionary
+    If Manager_State.Dictionaries.exists(DictionaryName) Then
+        Set GetDictionary = Manager_State.Dictionaries(DictionaryName)
+    End If
+End Function
+
+
+' ------------------------------------------------------------------
+' # Методы для работы с элементами словаря
+' ------------------------------------------------------------------
+
+' # [Function GetItem] - Получение элемента из словаря
+Public Function GetItem(ByVal DictionaryName As String, ByVal ItemKey As Variant) As Variant
+    If Not Manager_State.Dictionaries.exists(DictionaryName) Then Exit Function
+    If Not Manager_State.Dictionaries(DictionaryName).exists(ItemKey) Then Exit Function
+
+    If IsObject(Manager_State.Dictionaries(DictionaryName)(ItemKey)) Then
+        Set GetItem = Manager_State.Dictionaries(DictionaryName)(ItemKey)
+    Else
+        GetItem = Manager_State.Dictionaries(DictionaryName)(ItemKey)
+    End If
+End Function
+
+' # [Function RemoveItem] - Удаление элемента из словаря
+Public Function RemoveItem(ByVal DictionaryName As String, ByVal ItemKey As Variant) As Boolean
+    If Not Manager_State.Dictionaries.exists(DictionaryName) Then Exit Function
+    If Not Manager_State.Dictionaries(DictionaryName).exists(ItemKey) Then Exit Function
+
+    Manager_State.Dictionaries(DictionaryName).Remove ItemKey
+    UpdateDictionaryInfo DictionaryName, Manager_State.Dictionaries(DictionaryName), "Dictionary"
+    RaiseEvent OnDictionaryChanged(DictionaryName)
+    RemoveItem = True
+End Function
+
+' # [Function GetKeys] - Получение всех ключей словаря
+Public Function GetKeys(ByVal DictionaryName As String) As Variant()
+    If Not Manager_State.Dictionaries.exists(DictionaryName) Then Exit Function
+
+    GetKeys = Manager_State.Dictionaries(DictionaryName).keys
+End Function
+
+' # [Function GetItems] - Получение всех значений словаря
+Public Function GetItems(ByVal DictionaryName As String) As Variant()
+    If Not Manager_State.Dictionaries.exists(DictionaryName) Then Exit Function
+
+    GetItems = Manager_State.Dictionaries(DictionaryName).Items
+End Function
+
+' # [Function ItemExists] - Проверка существования элемента в словаре
+Public Function ItemExists(ByVal DictionaryName As String, ByVal ItemKey As Variant) As Boolean
+    If Not Manager_State.Dictionaries.exists(DictionaryName) Then Exit Function
+
+    ItemExists = Manager_State.Dictionaries(DictionaryName).exists(ItemKey)
+End Function

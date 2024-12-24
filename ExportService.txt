@@ -1,0 +1,651 @@
+Attribute VB_Name = "ExportService"
+Option Explicit
+
+Sub GenerateErrorJson()
+    Dim errorList As Collection
+    Set errorList = New Collection
+
+    ' Создаем словари
+    Dim errorCodes As Scripting.Dictionary
+    Dim errorLevels As Scripting.Dictionary
+    Dim errorMessages As Scripting.Dictionary
+    Dim errorCategories As Scripting.Dictionary
+    Dim recommendationMessages As Scripting.Dictionary
+    
+    Set errorCodes = New Scripting.Dictionary
+    Set errorLevels = New Scripting.Dictionary
+    Set errorMessages = New Scripting.Dictionary
+    Set errorCategories = New Scripting.Dictionary
+    Set recommendationMessages = New Scripting.Dictionary
+
+    ' Добавляем отладочный вывод
+    Debug.Print "Начало процесса генерации JSON"
+    Debug.Print "Текущее время: " & Now
+    
+    ' Заполняем словарь уровней ошибок
+    errorLevels.Add "ERR_ARRAY_OPERATION_INVALID", 3
+    errorLevels.Add "ERR_CELL_NOT_FOUND", 3
+    errorLevels.Add "ERR_CELL_OPERATION_INVALID", 4
+    errorLevels.Add "ERR_CURRENT_OBJECT_OPERATION_INVALID", 5
+    errorLevels.Add "ERR_DATA_INVALID", 2
+    errorLevels.Add "ERR_DATA_TRUNCATED", 4
+    errorLevels.Add "ERR_DATA_TYPE_MISMATCH", 4
+    errorLevels.Add "ERR_DATA_TYPE_MISMATCH2", 4
+    errorLevels.Add "ERR_DISK_FULL", 5
+    errorLevels.Add "ERR_DISK_NOT_AVAILABLE", 5
+    errorLevels.Add "ERR_DIVISION_BY_ZERO", 1
+    errorLevels.Add "ERR_DYNAMIC_ARRAY_OPERATION_INVALID", 4
+    errorLevels.Add "ERR_EXCEL_BUSY", 5
+    errorLevels.Add "ERR_EXCEL_NOT_RESPONDING", 5
+    errorLevels.Add "ERR_EXPRESSION_CONTAINS_ERROR", 3
+    errorLevels.Add "ERR_EXPRESSION_OPERATION_INVALID", 4
+    errorLevels.Add "ERR_FIELD_DATA_INVALID", 2
+    errorLevels.Add "ERR_FIELD_DATA_OPERATION_INVALID", 2
+    errorLevels.Add "ERR_FILE_ALREADY_OPEN", 2
+    errorLevels.Add "ERR_FILE_CREATION_ERROR", 4
+    errorLevels.Add "ERR_FILE_NOT_FOUND", 2
+    errorLevels.Add "ERR_FILE_STREAM_OPERATION_INVALID", 4
+    errorLevels.Add "ERR_FORMULA_CONTAINS_ERROR", 3
+    errorLevels.Add "ERR_FORMULA_OPERATION_INVALID", 4
+    errorLevels.Add "ERR_INITIALIZATION_ERROR", 2
+    errorLevels.Add "ERR_INTERFACE_OPERATION_INVALID", 3
+    errorLevels.Add "ERR_INVALID_DATA_TYPE", 2
+    errorLevels.Add "ERR_INVALID_EXIT_METHOD", 1
+    errorLevels.Add "ERR_INVALID_OPERATION", 1
+    errorLevels.Add "ERR_INVALID_PARAMETER", 2
+    errorLevels.Add "ERR_LIBRARY_LOAD_ERROR", 3
+    errorLevels.Add "ERR_MACRO_ALREADY_RUNNING", 3
+    errorLevels.Add "ERR_MACRO_CANNOT_BE_STARTED", 3
+    errorLevels.Add "ERR_MACRO_NOT_FOUND", 3
+    errorLevels.Add "ERR_MACRO_OPERATION_INVALID", 4
+    errorLevels.Add "ERR_MACRO_PARAMETER_OPERATION_INVALID", 4
+    errorLevels.Add "ERR_MACRO_PROPERTY_OPERATION_INVALID", 4
+    errorLevels.Add "ERR_MACRO_SYNTAX_ERROR", 4
+    errorLevels.Add "ERR_MANAGED_OBJECT_OPERATION_INVALID", 5
+    errorLevels.Add "ERR_MEMORY_NOT_AVAILABLE", 5
+    errorLevels.Add "ERR_MERGE_ERROR", 1
+    errorLevels.Add "ERR_OBJECT_ALREADY_CREATED", 4
+    errorLevels.Add "ERR_OBJECT_ALREADY_IN_USE", 4
+    errorLevels.Add "ERR_OBJECT_CREATION_ERROR", 4
+    errorLevels.Add "ERR_OBJECT_CREATION_ERROR2", 5
+    errorLevels.Add "ERR_OBJECT_METHOD_OPERATION_INVALID", 4
+    errorLevels.Add "ERR_OBJECT_NOT_ACCESSIBLE", 4
+    errorLevels.Add "ERR_OBJECT_NOT_FOUND", 3
+    errorLevels.Add "ERR_OBJECT_NOT_FOUND_IN_COLLECTION", 3
+    errorLevels.Add "ERR_OBJECT_NOT_INITIALIZED", 4
+    errorLevels.Add "ERR_OBJECT_NOT_SET", 4
+    errorLevels.Add "ERR_OBJECT_NOT_SUPPORTED", 3
+    errorLevels.Add "ERR_OBJECT_OPERATION_INVALID", 4
+    errorLevels.Add "ERR_OBJECT_PROPERTY_OPERATION_INVALID", 4
+    errorLevels.Add "ERR_OBJECT_VARIABLE_NOT_SET", 4
+    errorLevels.Add "ERR_OVERFLOW", 1
+    errorLevels.Add "ERR_PARAMETER_OPERATION_INVALID", 4
+    errorLevels.Add "ERR_PARAMETER_TYPE_MISMATCH", 3
+    errorLevels.Add "ERR_PERMISSION_DENIED", 3
+    errorLevels.Add "ERR_PROPERTY_OPERATION_INVALID", 3
+    errorLevels.Add "ERR_PROPERTY_OPERATION_INVALID2", 4
+    errorLevels.Add "ERR_PROPERTY_OPERATION_INVALID3", 4
+    errorLevels.Add "ERR_RANGE_NOT_FOUND", 3
+    errorLevels.Add "ERR_REPORT_ALREADY_OPEN", 4
+    errorLevels.Add "ERR_REPORT_CANNOT_BE_OPENED", 4
+    errorLevels.Add "ERR_REPORT_NOT_FOUND", 4
+    errorLevels.Add "ERR_REPORT_PROPERTY_OPERATION_INVALID", 4
+    errorLevels.Add "ERR_REPORT_SYNTAX_ERROR", 4
+    errorLevels.Add "ERR_STRING_TOO_LONG", 2
+    errorLevels.Add "ERR_SUBROUTINE_NOT_FOUND", 2
+    errorLevels.Add "ERR_SYSTEM_RESOURCE_UNAVAILABLE", 5
+    errorLevels.Add "ERR_TYPE_MISMATCH", 2
+    errorLevels.Add "ERR_UNMANAGED_OBJECT_OPERATION_INVALID", 5
+    errorLevels.Add "ERR_WORKBOOK_NOT_AVAILABLE", 3
+    errorLevels.Add "ERR_WORKBOOK_OPERATION_INVALID", 4
+    errorLevels.Add "ERR_WORKSHEET_NOT_AVAILABLE", 3
+    errorLevels.Add "ERR_WORKSHEET_OPERATION_INVALID", 4
+
+' Создаем словарь для оригинальных сообщений об ошибках
+Dim errorOriginalMessages As Scripting.Dictionary
+Set errorOriginalMessages = New Scripting.Dictionary
+
+' Заполняем словарь оригинальных сообщений об ошибках
+With errorOriginalMessages
+    .Add "ERR_ARRAY_OPERATION_INVALID", "Invalid operation for array"
+    .Add "ERR_CELL_NOT_FOUND", "Cell range does not exist"
+    .Add "ERR_CELL_OPERATION_INVALID", "Invalid operation for cell"
+    .Add "ERR_CURRENT_OBJECT_OPERATION_INVALID", "Invalid operation for current object"
+    .Add "ERR_DATA_INVALID", "Invalid data value"
+    .Add "ERR_DATA_TRUNCATED", "Data truncation"
+    .Add "ERR_DATA_TYPE_MISMATCH", "Invalid operation for data field"
+    .Add "ERR_DATA_TYPE_MISMATCH2", "Data type mismatch"
+    .Add "ERR_DISK_FULL", "Disk is full"
+    .Add "ERR_DISK_NOT_AVAILABLE", "Disk not available"
+    .Add "ERR_DIVISION_BY_ZERO", "Division by zero"
+    .Add "ERR_DYNAMIC_ARRAY_OPERATION_INVALID", "Invalid operation for dynamic array"
+    .Add "ERR_EXCEL_BUSY", "Excel is busy"
+    .Add "ERR_EXCEL_NOT_RESPONDING", "Excel not responding"
+    .Add "ERR_EXPRESSION_CONTAINS_ERROR", "Expression contains error"
+    .Add "ERR_EXPRESSION_OPERATION_INVALID", "Invalid operation for expression"
+    .Add "ERR_FIELD_DATA_INVALID", "Invalid value in data field"
+    .Add "ERR_FIELD_DATA_OPERATION_INVALID", "Invalid operation for data field"
+    .Add "ERR_FILE_ALREADY_OPEN", "File already open"
+    .Add "ERR_FILE_CREATION_ERROR", "File creation error"
+    .Add "ERR_FILE_NOT_FOUND", "File not found"
+    .Add "ERR_FILE_STREAM_OPERATION_INVALID", "Invalid operation for file stream"
+    .Add "ERR_FORMULA_CONTAINS_ERROR", "Formula contains error"
+    .Add "ERR_FORMULA_OPERATION_INVALID", "Invalid operation for formula"
+    .Add "ERR_INITIALIZATION_ERROR", "Initialization error"
+    .Add "ERR_INTERFACE_OPERATION_INVALID", "Invalid operation for interface"
+    .Add "ERR_INVALID_DATA_TYPE", "Invalid data type"
+    .Add "ERR_INVALID_EXIT_METHOD", "Invalid exit method"
+    .Add "ERR_INVALID_OPERATION", "Invalid operation"
+    .Add "ERR_INVALID_PARAMETER", "Invalid parameter"
+    .Add "ERR_LIBRARY_LOAD_ERROR", "Library load error"
+    .Add "ERR_MACRO_ALREADY_RUNNING", "Macro is already running"
+    .Add "ERR_MACRO_CANNOT_BE_STARTED", "Macro cannot be started"
+    .Add "ERR_MACRO_NOT_FOUND", "Macro not found"
+    .Add "ERR_MACRO_OPERATION_INVALID", "Invalid operation for macro"
+    .Add "ERR_MACRO_PARAMETER_OPERATION_INVALID", "Invalid operation for macro parameter"
+    .Add "ERR_MACRO_PROPERTY_OPERATION_INVALID", "Invalid operation for macro properties"
+    .Add "ERR_MACRO_SYNTAX_ERROR", "Macro syntax error"
+    .Add "ERR_MANAGED_OBJECT_OPERATION_INVALID", "Invalid operation for managed object"
+    .Add "ERR_MEMORY_NOT_AVAILABLE", "Memory not available"
+    .Add "ERR_MERGE_ERROR", "Merge error"
+    .Add "ERR_OBJECT_ALREADY_CREATED", "Object already created"
+    .Add "ERR_OBJECT_ALREADY_IN_USE", "Object already in use"
+    .Add "ERR_OBJECT_CREATION_ERROR", "Object creation error"
+    .Add "ERR_OBJECT_CREATION_ERROR2", "Object creation error"
+    .Add "ERR_OBJECT_METHOD_OPERATION_INVALID", "Invalid operation for object method"
+    .Add "ERR_OBJECT_NOT_ACCESSIBLE", "Object not accessible"
+    .Add "ERR_OBJECT_NOT_FOUND", "Object not found"
+    .Add "ERR_OBJECT_NOT_FOUND_IN_COLLECTION", "Object not found in collection"
+    .Add "ERR_OBJECT_NOT_INITIALIZED", "Object not initialized"
+    .Add "ERR_OBJECT_NOT_SET", "Object not set"
+    .Add "ERR_OBJECT_NOT_SUPPORTED", "Object does not support property or method"
+    .Add "ERR_OBJECT_OPERATION_INVALID", "Invalid operation for object"
+    .Add "ERR_OBJECT_PROPERTY_OPERATION_INVALID", "Invalid operation for object property"
+    .Add "ERR_OBJECT_VARIABLE_NOT_SET", "Object or variable not set"
+    .Add "ERR_OVERFLOW", "Overflow"
+    .Add "ERR_PARAMETER_OPERATION_INVALID", "Invalid operation for parameter"
+    .Add "ERR_PARAMETER_TYPE_MISMATCH", "Parameter type mismatch"
+    .Add "ERR_PERMISSION_DENIED", "Permission denied"
+    .Add "ERR_PROPERTY_OPERATION_INVALID", "Invalid operation for property"
+    .Add "ERR_PROPERTY_OPERATION_INVALID2", "Invalid operation for properties"
+    .Add "ERR_PROPERTY_OPERATION_INVALID3", "Invalid operation for property"
+    .Add "ERR_RANGE_NOT_FOUND", "Range not found"
+    .Add "ERR_REPORT_ALREADY_OPEN", "Report already open"
+    .Add "ERR_REPORT_CANNOT_BE_OPENED", "Report cannot be opened"
+    .Add "ERR_REPORT_NOT_FOUND", "Report not found"
+    .Add "ERR_REPORT_PROPERTY_OPERATION_INVALID", "Invalid operation for report property"
+    .Add "ERR_REPORT_SYNTAX_ERROR", "Report syntax error"
+    .Add "ERR_STRING_TOO_LONG", "String exceeds maximum length"
+    .Add "ERR_SUBROUTINE_NOT_FOUND", "Subroutine not found"
+    .Add "ERR_SYSTEM_RESOURCE_UNAVAILABLE", "System resources unavailable"
+    .Add "ERR_TYPE_MISMATCH", "Type mismatch"
+    .Add "ERR_UNMANAGED_OBJECT_OPERATION_INVALID", "Invalid operation for unmanaged object"
+    .Add "ERR_WORKBOOK_NOT_AVAILABLE", "Workbook not available"
+    .Add "ERR_WORKBOOK_OPERATION_INVALID", "Invalid operation for workbook"
+    .Add "ERR_WORKSHEET_NOT_AVAILABLE", "Worksheet not available"
+    .Add "ERR_WORKSHEET_OPERATION_INVALID", "Invalid operation for worksheet"
+End With
+
+
+    ' Заполняем словарь сообщений об ошибках
+    errorMessages.Add "ERR_ARRAY_OPERATION_INVALID", "Недопустимая операция для массива"
+    errorMessages.Add "ERR_CELL_NOT_FOUND", "Диапазон ячеек не существует"
+    errorMessages.Add "ERR_CELL_OPERATION_INVALID", "Недопустимая операция для ячейки"
+    errorMessages.Add "ERR_CURRENT_OBJECT_OPERATION_INVALID", "Недопустимая операция для текущего объекта"
+    errorMessages.Add "ERR_DATA_INVALID", "Недопустимое значение в поле данных"
+    errorMessages.Add "ERR_DATA_TRUNCATED", "Обрезание данных"
+    errorMessages.Add "ERR_DATA_TYPE_MISMATCH", "Недопустимая операция для поля данных"
+    errorMessages.Add "ERR_DATA_TYPE_MISMATCH2", "Несовпадение типов данных"
+    errorMessages.Add "ERR_DISK_FULL", "Диск полный"
+    errorMessages.Add "ERR_DISK_NOT_AVAILABLE", "Диск не доступен"
+    errorMessages.Add "ERR_DIVISION_BY_ZERO", "Деление на ноль"
+    errorMessages.Add "ERR_DYNAMIC_ARRAY_OPERATION_INVALID", "Недопустимая операция для динамического массива"
+    errorMessages.Add "ERR_EXCEL_BUSY", "Excel занят"
+    errorMessages.Add "ERR_EXCEL_NOT_RESPONDING", "Excel не отвечает"
+    errorMessages.Add "ERR_EXPRESSION_CONTAINS_ERROR", "Выражение содержит ошибку"
+    errorMessages.Add "ERR_EXPRESSION_OPERATION_INVALID", "Недопустимая операция для выражения"
+    errorMessages.Add "ERR_FIELD_DATA_INVALID", "Недопустимое значение в поле данных"
+    errorMessages.Add "ERR_FIELD_DATA_OPERATION_INVALID", "Недопустимая операция для поля данных"
+    errorMessages.Add "ERR_FILE_ALREADY_OPEN", "Файл уже открыт"
+    errorMessages.Add "ERR_FILE_CREATION_ERROR", "Ошибка создания файла"
+    errorMessages.Add "ERR_FILE_NOT_FOUND", "Файл не найден"
+    errorMessages.Add "ERR_FILE_STREAM_OPERATION_INVALID", "Недопустимая операция для файлового потока"
+    errorMessages.Add "ERR_FORMULA_CONTAINS_ERROR", "Формула содержит ошибку"
+    errorMessages.Add "ERR_FORMULA_OPERATION_INVALID", "Недопустимая операция для формулы"
+    errorMessages.Add "ERR_INITIALIZATION_ERROR", "Ошибка инициализации"
+    errorMessages.Add "ERR_INTERFACE_OPERATION_INVALID", "Недопустимая операция для точки доступа"
+    errorMessages.Add "ERR_INVALID_DATA_TYPE", "Недопустимый тип данных"
+    errorMessages.Add "ERR_INVALID_EXIT_METHOD", "Недопустимый выход из метода"
+    errorMessages.Add "ERR_INVALID_OPERATION", "Недопустимая операция"
+    errorMessages.Add "ERR_INVALID_PARAMETER", "Недопустимый параметр"
+    errorMessages.Add "ERR_LIBRARY_LOAD_ERROR", "Ошибка загрузки библиотеки"
+    errorMessages.Add "ERR_MACRO_ALREADY_RUNNING", "Макрос уже запущен"
+    errorMessages.Add "ERR_MACRO_CANNOT_BE_STARTED", "Макрос не может быть запущен"
+    errorMessages.Add "ERR_MACRO_NOT_FOUND", "Макрос не существует"
+    errorMessages.Add "ERR_MACRO_OPERATION_INVALID", "Недопустимая операция для макроса"
+    errorMessages.Add "ERR_MACRO_PARAMETER_OPERATION_INVALID", "Недопустимая операция для параметра макроса"
+    errorMessages.Add "ERR_MACRO_PROPERTY_OPERATION_INVALID", "Недопустимая операция для свойств макроса"
+    errorMessages.Add "ERR_MACRO_SYNTAX_ERROR", "Синтаксическая ошибка макроса"
+    errorMessages.Add "ERR_MANAGED_OBJECT_OPERATION_INVALID", "Недопустимая операция для управляемого объекта"
+    errorMessages.Add "ERR_MEMORY_NOT_AVAILABLE", "память не доступна"
+    errorMessages.Add "ERR_MERGE_ERROR", "Ошибка объединения"
+    errorMessages.Add "ERR_OBJECT_ALREADY_CREATED", "Объект уже создан"
+    errorMessages.Add "ERR_OBJECT_ALREADY_IN_USE", "Объект уже используется"
+    errorMessages.Add "ERR_OBJECT_CREATION_ERROR", "Ошибка создания объекта"
+    errorMessages.Add "ERR_OBJECT_CREATION_ERROR2", "Ошибка создания объекта"
+    errorMessages.Add "ERR_OBJECT_METHOD_OPERATION_INVALID", "Недопустимая операция для метода объекта"
+    errorMessages.Add "ERR_OBJECT_NOT_ACCESSIBLE", "Объект недоступен"
+    errorMessages.Add "ERR_OBJECT_NOT_FOUND", "Объект не найден"
+    errorMessages.Add "ERR_OBJECT_NOT_FOUND_IN_COLLECTION", "Объект не найден в коллекции"
+    errorMessages.Add "ERR_OBJECT_NOT_INITIALIZED", "Объект не инициализирован"
+    errorMessages.Add "ERR_OBJECT_NOT_SET", "Объект не установлен"
+    errorMessages.Add "ERR_OBJECT_NOT_SUPPORTED", "Объект не поддерживает свойство или метод"
+    errorMessages.Add "ERR_OBJECT_OPERATION_INVALID", "Недопустимая операция для объекта"
+    errorMessages.Add "ERR_OBJECT_PROPERTY_OPERATION_INVALID", "Недопустимая операция для свойства объекта"
+    errorMessages.Add "ERR_OBJECT_VARIABLE_NOT_SET", "Объект или переменная не существует"
+    errorMessages.Add "ERR_OVERFLOW", "Переполнение"
+    errorMessages.Add "ERR_PARAMETER_OPERATION_INVALID", "Недопустимая операция для параметра"
+    errorMessages.Add "ERR_PARAMETER_TYPE_MISMATCH", "Недопустимый тип данных для параметра"
+    errorMessages.Add "ERR_PERMISSION_DENIED", "Permission denied"
+    errorMessages.Add "ERR_PROPERTY_OPERATION_INVALID", "Недопустимая операция для свойства"
+    errorMessages.Add "ERR_PROPERTY_OPERATION_INVALID2", "Недопустимая операция для свойств"
+    errorMessages.Add "ERR_PROPERTY_OPERATION_INVALID3", "Недопустимая операция для свойства"
+    errorMessages.Add "ERR_RANGE_NOT_FOUND", "Область данных не существует"
+    errorMessages.Add "ERR_REPORT_ALREADY_OPEN", "Отчет уже открыт"
+    errorMessages.Add "ERR_REPORT_CANNOT_BE_OPENED", "Отчет не может быть открыт"
+    errorMessages.Add "ERR_REPORT_NOT_FOUND", "Отчет не найден"
+    errorMessages.Add "ERR_REPORT_PROPERTY_OPERATION_INVALID", "Недопустимая операция для свойства отчета"
+    errorMessages.Add "ERR_REPORT_SYNTAX_ERROR", "Синтаксическая ошибка отчета"
+    errorMessages.Add "ERR_STRING_TOO_LONG", "Длина строки превышает допустимый размер"
+    errorMessages.Add "ERR_SUBROUTINE_NOT_FOUND", "Подпрограмма не существует"
+    errorMessages.Add "ERR_SYSTEM_RESOURCE_UNAVAILABLE", "Системные ресурсы недоступны"
+    errorMessages.Add "ERR_TYPE_MISMATCH", "Тип не совпадает"
+    errorMessages.Add "ERR_UNMANAGED_OBJECT_OPERATION_INVALID", "Недопустимая операция для неуправляемого объекта"
+    errorMessages.Add "ERR_WORKBOOK_NOT_AVAILABLE", "Рабочая книга не доступна"
+    errorMessages.Add "ERR_WORKBOOK_OPERATION_INVALID", "Недопустимая операция для рабочей книги"
+    errorMessages.Add "ERR_WORKSHEET_NOT_AVAILABLE", "Рабочий лист не доступен"
+    errorMessages.Add "ERR_WORKSHEET_OPERATION_INVALID", "Недопустимая операция для рабочего листа"
+
+    recommendationMessages.Add "ERR_ARRAY_OPERATION_INVALID", "При индексировании массива сначала проверьте LBound и UBound. При выходе за границы используйте обработку ошибок"
+    recommendationMessages.Add "ERR_CELL_NOT_FOUND", "Перед работой с диапазоном используйте On Error Resume Next, затем проверку через Is Nothing. Восстановите обработку ошибок"
+    recommendationMessages.Add "ERR_CELL_OPERATION_INVALID", "Для защищенных ячеек проверьте свойства Protection и Hidden. При необходимости временно снимите защиту листа"
+    recommendationMessages.Add "ERR_CURRENT_OBJECT_OPERATION_INVALID", "Перед вызовом методов объекта проверьте его тип через TypeName() и поддержку требуемого интерфейса"
+    recommendationMessages.Add "ERR_DATA_INVALID", "Для числовых полей используйте IsNumeric() и проверку диапазона допустимых значений. Добавьте сообщения об ошибке"
+    recommendationMessages.Add "ERR_DATA_TRUNCATED", "При работе со строками проверяйте Len() результата. Используйте Left() с точным указанием максимальной длины"
+    recommendationMessages.Add "ERR_DATA_TYPE_MISMATCH", "Используйте явное приведение типов через CLng(), CStr(). Добавьте предварительную проверку возможности преобразования"
+    recommendationMessages.Add "ERR_DATA_TYPE_MISMATCH2", "Перед операциями проверяйте совместимость типов через TypeName(). Используйте промежуточные переменные"
+    recommendationMessages.Add "ERR_DISK_FULL", "Проверяйте свободное место через FileSystemObject.GetDrive().FreeSpace перед записью больших файлов"
+    recommendationMessages.Add "ERR_DISK_NOT_AVAILABLE", "Используйте FSO.DriveExists() и FSO.GetDrive().IsReady для проверки готовности диска к операциям"
+    recommendationMessages.Add "ERR_DIVISION_BY_ZERO", "При делении сначала проверьте знаменатель на ноль и граничные значения. Предусмотрите альтернативную логику"
+    recommendationMessages.Add "ERR_DYNAMIC_ARRAY_OPERATION_INVALID", "При изменении размера массива используйте ReDim Preserve. Проверяйте успешность через LBound/UBound"
+    recommendationMessages.Add "ERR_EXCEL_BUSY", "Для проверки занятости Excel используйте GetObject с таймаутом. Добавьте механизм повторных попыток"
+    recommendationMessages.Add "ERR_EXCEL_NOT_RESPONDING", "Отключайте обновление экрана и автовычисления в начале длительных операций. Добавьте DoEvents"
+    recommendationMessages.Add "ERR_EXPRESSION_CONTAINS_ERROR", "Используйте IsError() для проверки формул. Добавьте обработку специфических ошибок Excel (#N/A, #DIV/0!)"
+    recommendationMessages.Add "ERR_EXPRESSION_OPERATION_INVALID", "Проверяйте синтаксис через Application.ConvertFormula(). Используйте Range.HasFormula для проверки типа"
+    recommendationMessages.Add "ERR_FIELD_DATA_INVALID", "При работе с полями данных используйте Range.NumberFormat для контроля формата. Проверяйте маски ввода"
+    recommendationMessages.Add "ERR_FIELD_DATA_OPERATION_INVALID", "Для полей данных проверяйте допустимость операции через Range.Locked и Range.FormulaHidden"
+    recommendationMessages.Add "ERR_FILE_ALREADY_OPEN", "Используйте On Error Resume Next при открытии файла. Проверяйте статус через Workbooks.CanCheckOut"
+    recommendationMessages.Add "ERR_FILE_CREATION_ERROR", "При создании файлов проверяйте права доступа через FileSystemObject. Используйте временные файлы"
+    recommendationMessages.Add "ERR_FILE_NOT_FOUND", "Для проверки существования файла используйте Dir() вместо прямого доступа. Учитывайте сетевые пути"
+    recommendationMessages.Add "ERR_FILE_STREAM_OPERATION_INVALID", "Для файловых потоков всегда используйте Using или явное закрытие. Проверяйте состояние потока"
+    recommendationMessages.Add "ERR_FORMULA_CONTAINS_ERROR", "При работе с формулами используйте Application.Volatile для контроля пересчета. Проверяйте ошибки"
+    recommendationMessages.Add "ERR_FORMULA_OPERATION_INVALID", "При работе с формулами массива используйте Range.FormulaArray. Проверяйте размерность результата"
+    recommendationMessages.Add "ERR_INITIALIZATION_ERROR", "Инициализируйте объекты в строгой последовательности. Используйте флаги успешной инициализации"
+    recommendationMessages.Add "ERR_INTERFACE_OPERATION_INVALID", "Проверяйте доступность интерфейса через QueryInterface. Освобождайте COM-объекты после использования"
+    recommendationMessages.Add "ERR_INVALID_DATA_TYPE", "Используйте TypeName() или VarType() для проверки типа. Добавьте преобразование типов при несоответствии"
+    recommendationMessages.Add "ERR_INVALID_EXIT_METHOD", "При выходе из процедуры используйте блок Finally для освобождения ресурсов. Закрывайте объекты"
+    recommendationMessages.Add "ERR_INVALID_OPERATION", "Проверяйте состояние объекта через специальные флаги готовности. Используйте таймауты для операций"
+    recommendationMessages.Add "ERR_INVALID_PARAMETER", "Создавайте отдельные процедуры валидации параметров. Проверяйте обязательные параметры первыми"
+    recommendationMessages.Add "ERR_LIBRARY_LOAD_ERROR", "Проверяйте наличие библиотек через GetObject. Добавьте обработку ошибок при загрузке компонентов"
+    recommendationMessages.Add "ERR_MACRO_ALREADY_RUNNING", "Используйте Application.EnableCancelKey для прерывания макроса. Добавьте точки сохранения состояния"
+    recommendationMessages.Add "ERR_MACRO_CANNOT_BE_STARTED", "Проверяйте Application.EnableEvents и Application.Interactive перед запуском макроса"
+    recommendationMessages.Add "ERR_MACRO_NOT_FOUND", "При вызове макросов проверяйте их существование через Application.MacroOptions. Используйте полные имена"
+    recommendationMessages.Add "ERR_MACRO_OPERATION_INVALID", "При проверке синтаксиса макросов используйте Debug.Assert. Добавьте логирование ошибок"
+    recommendationMessages.Add "ERR_MACRO_PARAMETER_OPERATION_INVALID", "Для параметров макросов проверяйте количество и типы через ParamArray. Используйте именованные аргументы"
+    recommendationMessages.Add "ERR_MACRO_PROPERTY_OPERATION_INVALID", "При работе со свойствами макросов проверяйте их через MacroOptions. Используйте категории"
+    recommendationMessages.Add "ERR_MANAGED_OBJECT_OPERATION_INVALID", "Для управляемых объектов используйте Using или Dispose. Проверяйте состояние объекта"
+    recommendationMessages.Add "ERR_MEMORY_NOT_AVAILABLE", "Проверяйте доступность памяти через GetSystemMetrics. Добавьте механизм освобождения ресурсов"
+    recommendationMessages.Add "ERR_MERGE_ERROR", "Перед слиянием проверяйте совместимость форматов данных. Создавайте резервные копии"
+    recommendationMessages.Add "ERR_OBJECT_ALREADY_CREATED", "При создании объектов проверяйте их существование через Is Nothing. Используйте единый конструктор"
+    recommendationMessages.Add "ERR_OBJECT_ALREADY_IN_USE", "При работе с объектами коллекции используйте On Error Resume Next при поиске. Проверяйте Count"
+    recommendationMessages.Add "ERR_OBJECT_CREATION_ERROR", "Инициализируйте объекты с помощью Set. Проверяйте успешность создания через Is Nothing"
+    recommendationMessages.Add "ERR_OBJECT_CREATION_ERROR2", "Используйте Late Binding при работе с необязательными компонентами. Проверяйте методы"
+    recommendationMessages.Add "ERR_OBJECT_METHOD_OPERATION_INVALID", "При использовании методов объекта проверяйте их доступность через TypeOf Is"
+    recommendationMessages.Add "ERR_OBJECT_NOT_ACCESSIBLE", "Проверяйте права доступа к объекту через GetAccessControl. Добавьте обработку исключений"
+    recommendationMessages.Add "ERR_OBJECT_NOT_FOUND", "При доступе к объектам используйте полные пути и проверку существования через Is Nothing"
+    recommendationMessages.Add "ERR_OBJECT_NOT_FOUND_IN_COLLECTION", "Для проверки существования в коллекции используйте метод Exists() или On Error Resume Next"
+    recommendationMessages.Add "ERR_OBJECT_NOT_INITIALIZED", "При инициализации объектов проверяйте успешность каждого шага. Используйте флаги состояния"
+    recommendationMessages.Add "ERR_OBJECT_NOT_SET", "При работе с объектными переменными всегда используйте Set и Nothing. Проверяйте через Is Nothing"
+    recommendationMessages.Add "ERR_OBJECT_NOT_SUPPORTED", "Проверяйте поддержку методов через TypeOf Is. Используйте обработку специфических ошибок"
+    recommendationMessages.Add "ERR_OBJECT_OPERATION_INVALID", "Перед операциями проверяйте состояние объекта через специальные методы. Добавьте таймауты"
+    recommendationMessages.Add "ERR_OBJECT_PROPERTY_OPERATION_INVALID", "Для свойств объекта используйте Property Let/Get с валидацией. Проверяйте границы"
+    recommendationMessages.Add "ERR_OBJECT_VARIABLE_NOT_SET", "При работе с переменными объектного типа проверяйте инициализацию через Is Nothing"
+    recommendationMessages.Add "ERR_OVERFLOW", "При работе с числами проверяйте границы типов данных. Используйте CLng для больших значений"
+    recommendationMessages.Add "ERR_PARAMETER_OPERATION_INVALID", "Создавайте константы для допустимых значений параметров. Проверяйте границы диапазонов"
+    recommendationMessages.Add "ERR_PARAMETER_TYPE_MISMATCH", "При работе с параметрами проверяйте типы через TypeName. Добавьте преобразование типов"
+    recommendationMessages.Add "ERR_PERMISSION_DENIED", "Проверяйте права доступа через GetAccessControl перед операциями. Обрабатывайте отказы"
+    recommendationMessages.Add "ERR_PROPERTY_OPERATION_INVALID", "При доступе к свойствам проверяйте их существование через VBA.HasProperty"
+    recommendationMessages.Add "ERR_PROPERTY_OPERATION_INVALID2", "Для свойств используйте значения по умолчанию. Проверяйте допустимость значений"
+    recommendationMessages.Add "ERR_PROPERTY_OPERATION_INVALID3", "При изменении свойств используйте промежуточные переменные. Проверяйте результат"
+    recommendationMessages.Add "ERR_RANGE_NOT_FOUND", "При работе с диапазонами указывайте родительский лист: Sheet1.Range. Проверяйте существование"
+    recommendationMessages.Add "ERR_REPORT_ALREADY_OPEN", "Проверяйте статус отчета через специальные флаги. Добавьте механизм блокировок"
+    recommendationMessages.Add "ERR_REPORT_CANNOT_BE_OPENED", "При открытии отчетов проверяйте доступность источников данных. Добавьте таймауты"
+    recommendationMessages.Add "ERR_REPORT_NOT_FOUND", "Для отчетов проверяйте наличие всех компонентов через Exists. Используйте полные пути"
+    recommendationMessages.Add "ERR_REPORT_PROPERTY_OPERATION_INVALID", "При работе со свойствами отчета используйте значения по умолчанию"
+    recommendationMessages.Add "ERR_REPORT_SYNTAX_ERROR", "Для синтаксиса отчетов используйте предварительную проверку через парсер"
+    recommendationMessages.Add "ERR_STRING_TOO_LONG", "Проверяйте длину строки через Len() перед операциями. Используйте константы максимумов"
+    recommendationMessages.Add "ERR_SUBROUTINE_NOT_FOUND", "При вызове подпрограмм проверяйте их существование через MacroOptions. Используйте полные имена"
+    recommendationMessages.Add "ERR_SYSTEM_RESOURCE_UNAVAILABLE", "Проверяйте доступность системных ресурсов через GetSystemMetrics. Добавьте очистку"
+    recommendationMessages.Add "ERR_TYPE_MISMATCH", "При работе с разными типами используйте VarType() для определения типа. Добавьте преобразование"
+    recommendationMessages.Add "ERR_UNMANAGED_OBJECT_OPERATION_INVALID", "При работе с неуправляемыми объектами используйте ReleaseComObject. Проверяйте ссылки"
+    recommendationMessages.Add "ERR_WORKBOOK_NOT_AVAILABLE", "Проверяйте доступность книги через CanCheckOut. Добавьте обработку блокировок"
+    recommendationMessages.Add "ERR_WORKBOOK_OPERATION_INVALID", "При операциях с книгой проверяйте состояние через ReadOnly и Protected"
+    recommendationMessages.Add "ERR_WORKSHEET_NOT_AVAILABLE", "Проверяйте доступность листа через Worksheets.Item и On Error Resume Next"
+    recommendationMessages.Add "ERR_WORKSHEET_OPERATION_INVALID", "При работе с листом отключайте DisplayPageBreaks и EnableCalculation для оптимизации"
+    recommendationMessages.Add "ERR_SYSTEM_RESOURCE_UNAVAILABLE2", "Для системных ресурсов добавьтe мониторинг использования памяти"
+
+
+    ' Собираем список ошибок
+
+    errorCodes.Add "ERR_ARRAY_OPERATION_INVALID", 35
+    errorCodes.Add "ERR_CELL_NOT_FOUND", 2024
+    errorCodes.Add "ERR_CELL_OPERATION_INVALID", 1032
+    errorCodes.Add "ERR_CURRENT_OBJECT_OPERATION_INVALID", 99
+    errorCodes.Add "ERR_DATA_INVALID", 2001
+    errorCodes.Add "ERR_DATA_TRUNCATED", 2050
+    errorCodes.Add "ERR_DATA_TYPE_MISMATCH", 2030
+    errorCodes.Add "ERR_DATA_TYPE_MISMATCH2", 2048
+    errorCodes.Add "ERR_DISK_FULL", 3000
+    errorCodes.Add "ERR_DISK_NOT_AVAILABLE", 3001
+    errorCodes.Add "ERR_DIVISION_BY_ZERO", 11
+    errorCodes.Add "ERR_DYNAMIC_ARRAY_OPERATION_INVALID", 76
+    errorCodes.Add "ERR_EXCEL_BUSY", 1001
+    errorCodes.Add "ERR_EXCEL_NOT_RESPONDING", 1000
+    errorCodes.Add "ERR_EXPRESSION_CONTAINS_ERROR", 2016
+    errorCodes.Add "ERR_EXPRESSION_OPERATION_INVALID", 2031
+    errorCodes.Add "ERR_FIELD_DATA_INVALID", 2007
+    errorCodes.Add "ERR_FIELD_DATA_OPERATION_INVALID", 2004
+    errorCodes.Add "ERR_FILE_ALREADY_OPEN", 1009
+    errorCodes.Add "ERR_FILE_CREATION_ERROR", 72
+    errorCodes.Add "ERR_FILE_NOT_FOUND", 1004
+    errorCodes.Add "ERR_FILE_STREAM_OPERATION_INVALID", 71
+    errorCodes.Add "ERR_FORMULA_CONTAINS_ERROR", 2015
+    errorCodes.Add "ERR_FORMULA_OPERATION_INVALID", 2032
+    errorCodes.Add "ERR_INITIALIZATION_ERROR", 5
+    errorCodes.Add "ERR_INTERFACE_OPERATION_INVALID", 40
+    errorCodes.Add "ERR_INVALID_DATA_TYPE", 17
+    errorCodes.Add "ERR_INVALID_EXIT_METHOD", 3
+    errorCodes.Add "ERR_INVALID_OPERATION", 10
+    errorCodes.Add "ERR_INVALID_PARAMETER", 20
+    errorCodes.Add "ERR_LIBRARY_LOAD_ERROR", 28
+    errorCodes.Add "ERR_MACRO_ALREADY_RUNNING", 2166
+    errorCodes.Add "ERR_MACRO_CANNOT_BE_STARTED", 2167
+    errorCodes.Add "ERR_MACRO_NOT_FOUND", 2165
+    errorCodes.Add "ERR_MACRO_OPERATION_INVALID", 2170
+    errorCodes.Add "ERR_MACRO_PARAMETER_OPERATION_INVALID", 2171
+    errorCodes.Add "ERR_MACRO_PROPERTY_OPERATION_INVALID", 2172
+    errorCodes.Add "ERR_MACRO_SYNTAX_ERROR", 2173
+    errorCodes.Add "ERR_MANAGED_OBJECT_OPERATION_INVALID", 96
+    errorCodes.Add "ERR_MEMORY_NOT_AVAILABLE", 3002
+    errorCodes.Add "ERR_MERGE_ERROR", 7
+    errorCodes.Add "ERR_OBJECT_ALREADY_CREATED", 451
+    errorCodes.Add "ERR_OBJECT_ALREADY_IN_USE", 454
+    errorCodes.Add "ERR_OBJECT_CREATION_ERROR", 93
+    errorCodes.Add "ERR_OBJECT_CREATION_ERROR2", 98
+    errorCodes.Add "ERR_OBJECT_METHOD_OPERATION_INVALID", 448
+    errorCodes.Add "ERR_OBJECT_NOT_ACCESSIBLE", 455
+    errorCodes.Add "ERR_OBJECT_NOT_FOUND", 424
+    errorCodes.Add "ERR_OBJECT_NOT_FOUND_IN_COLLECTION", 445
+    errorCodes.Add "ERR_OBJECT_NOT_INITIALIZED", 453
+    errorCodes.Add "ERR_OBJECT_NOT_SET", 452
+    errorCodes.Add "ERR_OBJECT_NOT_SUPPORTED", 438
+    errorCodes.Add "ERR_OBJECT_OPERATION_INVALID", 446
+    errorCodes.Add "ERR_OBJECT_PROPERTY_OPERATION_INVALID", 447
+    errorCodes.Add "ERR_OBJECT_VARIABLE_NOT_SET", 91
+    errorCodes.Add "ERR_OVERFLOW", 6
+    errorCodes.Add "ERR_PARAMETER_OPERATION_INVALID", 94
+    errorCodes.Add "ERR_PARAMETER_TYPE_MISMATCH", 36
+    errorCodes.Add "ERR_PERMISSION_DENIED", 70
+    errorCodes.Add "ERR_PROPERTY_OPERATION_INVALID", 55
+    errorCodes.Add "ERR_PROPERTY_OPERATION_INVALID2", 92
+    errorCodes.Add "ERR_PROPERTY_OPERATION_INVALID3", 95
+    errorCodes.Add "ERR_RANGE_NOT_FOUND", 2023
+    errorCodes.Add "ERR_REPORT_ALREADY_OPEN", 2502
+    errorCodes.Add "ERR_REPORT_CANNOT_BE_OPENED", 2503
+    errorCodes.Add "ERR_REPORT_NOT_FOUND", 2501
+    errorCodes.Add "ERR_REPORT_PROPERTY_OPERATION_INVALID", 2505
+    errorCodes.Add "ERR_REPORT_SYNTAX_ERROR", 2504
+    errorCodes.Add "ERR_STRING_TOO_LONG", 11
+    errorCodes.Add "ERR_SUBROUTINE_NOT_FOUND", 9
+    errorCodes.Add "ERR_SYSTEM_RESOURCE_UNAVAILABLE", 3003
+    errorCodes.Add "ERR_TYPE_MISMATCH", 13
+    errorCodes.Add "ERR_UNMANAGED_OBJECT_OPERATION_INVALID", 97
+    errorCodes.Add "ERR_WORKBOOK_NOT_AVAILABLE", 1024
+    errorCodes.Add "ERR_WORKBOOK_OPERATION_INVALID", 1030
+    errorCodes.Add "ERR_WORKSHEET_NOT_AVAILABLE", 1026
+    errorCodes.Add "ERR_WORKSHEET_OPERATION_INVALID", 1031
+
+
+' Заполняем словарь категорий
+With errorCategories
+    ' 1. Операции с данными и типами данных
+    .Add "ERR_DATA_INVALID", "Ошибки данных"
+    .Add "ERR_DATA_TRUNCATED", "Ошибки данных"
+    .Add "ERR_DATA_TYPE_MISMATCH", "Ошибки данных"
+    .Add "ERR_DATA_TYPE_MISMATCH2", "Ошибки данных"
+    .Add "ERR_INVALID_DATA_TYPE", "Ошибки данных"
+    .Add "ERR_TYPE_MISMATCH", "Ошибки данных"
+    .Add "ERR_STRING_TOO_LONG", "Ошибки данных"
+
+    ' 2. Операции с файлами и дисками
+    .Add "ERR_DISK_FULL", "Ошибки файловой системы"
+    .Add "ERR_DISK_NOT_AVAILABLE", "Ошибки файловой системы"
+    .Add "ERR_FILE_ALREADY_OPEN", "Ошибки файловой системы"
+    .Add "ERR_FILE_CREATION_ERROR", "Ошибки файловой системы"
+    .Add "ERR_FILE_NOT_FOUND", "Ошибки файловой системы"
+    .Add "ERR_FILE_STREAM_OPERATION_INVALID", "Ошибки файловой системы"
+
+    ' 3. Операции с Excel
+    .Add "ERR_EXCEL_BUSY", "Ошибки Excel"
+    .Add "ERR_EXCEL_NOT_RESPONDING", "Ошибки Excel"
+    .Add "ERR_WORKBOOK_NOT_AVAILABLE", "Ошибки Excel"
+    .Add "ERR_WORKBOOK_OPERATION_INVALID", "Ошибки Excel"
+    .Add "ERR_WORKSHEET_NOT_AVAILABLE", "Ошибки Excel"
+    .Add "ERR_WORKSHEET_OPERATION_INVALID", "Ошибки Excel"
+    .Add "ERR_CELL_NOT_FOUND", "Ошибки Excel"
+    .Add "ERR_CELL_OPERATION_INVALID", "Ошибки Excel"
+    .Add "ERR_RANGE_NOT_FOUND", "Ошибки Excel"
+
+    ' 4. Операции с макросами
+    .Add "ERR_MACRO_ALREADY_RUNNING", "Ошибки макросов"
+    .Add "ERR_MACRO_CANNOT_BE_STARTED", "Ошибки макросов"
+    .Add "ERR_MACRO_NOT_FOUND", "Ошибки макросов"
+    .Add "ERR_MACRO_OPERATION_INVALID", "Ошибки макросов"
+    .Add "ERR_MACRO_PARAMETER_OPERATION_INVALID", "Ошибки макросов"
+    .Add "ERR_MACRO_PROPERTY_OPERATION_INVALID", "Ошибки макросов"
+    .Add "ERR_MACRO_SYNTAX_ERROR", "Ошибки макросов"
+
+    ' 5. Операции с объектами
+    .Add "ERR_OBJECT_ALREADY_CREATED", "Ошибки объектов"
+    .Add "ERR_OBJECT_ALREADY_IN_USE", "Ошибки объектов"
+    .Add "ERR_OBJECT_CREATION_ERROR", "Ошибки объектов"
+    .Add "ERR_OBJECT_CREATION_ERROR2", "Ошибки объектов"
+    .Add "ERR_OBJECT_METHOD_OPERATION_INVALID", "Ошибки объектов"
+    .Add "ERR_OBJECT_NOT_ACCESSIBLE", "Ошибки объектов"
+    .Add "ERR_OBJECT_NOT_FOUND", "Ошибки объектов"
+    .Add "ERR_OBJECT_NOT_FOUND_IN_COLLECTION", "Ошибки объектов"
+    .Add "ERR_OBJECT_NOT_INITIALIZED", "Ошибки объектов"
+    .Add "ERR_OBJECT_NOT_SET", "Ошибки объектов"
+    .Add "ERR_OBJECT_NOT_SUPPORTED", "Ошибки объектов"
+    .Add "ERR_OBJECT_OPERATION_INVALID", "Ошибки объектов"
+    .Add "ERR_OBJECT_PROPERTY_OPERATION_INVALID", "Ошибки объектов"
+    .Add "ERR_OBJECT_VARIABLE_NOT_SET", "Ошибки объектов"
+
+    ' 6. Операции с массивами
+    .Add "ERR_ARRAY_OPERATION_INVALID", "Ошибки массивов"
+    .Add "ERR_DYNAMIC_ARRAY_OPERATION_INVALID", "Ошибки массивов"
+
+    ' 7. Системные ошибки
+    .Add "ERR_INITIALIZATION_ERROR", "Системные ошибки"
+    .Add "ERR_LIBRARY_LOAD_ERROR", "Системные ошибки"
+    .Add "ERR_MEMORY_NOT_AVAILABLE", "Системные ошибки"
+    .Add "ERR_SYSTEM_RESOURCE_UNAVAILABLE", "Системные ошибки"
+    .Add "ERR_PERMISSION_DENIED", "Системные ошибки"
+
+    ' 8. Математические ошибки
+    .Add "ERR_DIVISION_BY_ZERO", "Математические ошибки"
+    .Add "ERR_OVERFLOW", "Математические ошибки"
+
+    ' 9. Ошибки выражений и формул
+    .Add "ERR_EXPRESSION_CONTAINS_ERROR", "Ошибки выражений"
+    .Add "ERR_EXPRESSION_OPERATION_INVALID", "Ошибки выражений"
+    .Add "ERR_FORMULA_CONTAINS_ERROR", "Ошибки выражений"
+    .Add "ERR_FORMULA_OPERATION_INVALID", "Ошибки выражений"
+
+    ' 10. Ошибки отчетов
+    .Add "ERR_REPORT_ALREADY_OPEN", "Ошибки отчетов"
+    .Add "ERR_REPORT_CANNOT_BE_OPENED", "Ошибки отчетов"
+    .Add "ERR_REPORT_NOT_FOUND", "Ошибки отчетов"
+    .Add "ERR_REPORT_PROPERTY_OPERATION_INVALID", "Ошибки отчетов"
+    .Add "ERR_REPORT_SYNTAX_ERROR", "Ошибки отчетов"
+End With
+    
+
+  ' Добавим отладочную информацию
+    Debug.Print "Проверка ключей и уровней:"
+    Dim errorKey As Variant
+    For Each errorKey In errorCodes.keys
+        Debug.Print "Ошибка: " & errorKey & _
+                  ", Уровень: " & IIf(errorLevels.exists(errorKey), errorLevels(errorKey), "не найден")
+    Next errorKey
+
+    ' Создаем объекты ошибок
+    For Each errorKey In errorCodes.keys
+        Dim errorData As Scripting.Dictionary
+        Set errorData = New Scripting.Dictionary
+        
+        ' Добавляем код ошибки
+        errorData.Add "ErrorCode", errorCodes(errorKey)
+        
+        ' Добавляем уровень с проверкой
+        If errorLevels.exists(errorKey) Then
+            errorData.Add "ErrorLevel", errorLevels(errorKey)
+            Debug.Print "Добавлен уровень " & errorLevels(errorKey) & " для ошибки " & errorKey
+        Else
+            Debug.Print "ВНИМАНИЕ: Не найден уровень для ошибки " & errorKey
+            errorData.Add "ErrorLevel", 0  ' Значение по умолчанию
+        End If
+        
+        ' Добавляем остальные данные
+        errorData.Add "ErrorCategory", IIf(errorCategories.exists(errorKey), errorCategories(errorKey), "Неизвестная категория")
+        errorData.Add "ErrorMessage", IIf(errorMessages.exists(errorKey), errorMessages(errorKey), "")
+        errorData.Add "ErrorRecommendation", IIf(recommendationMessages.exists(errorKey), recommendationMessages(errorKey), "")
+        ' В функции создания объекта ошибки добавляем оригинальное сообщение
+        errorData.Add "ErrorOriginalMessage", IIf(errorOriginalMessages.exists(errorKey), errorOriginalMessages(errorKey), "")
+
+        errorList.Add errorData
+    Next errorKey
+    
+        Dim ErrorCache As Collection
+    Set ErrorCache = BaseManager.GetFromCache("ErrorCache")
+    
+    If Not ErrorCache Is Nothing Then
+        Dim errorItem As Scripting.Dictionary
+        For Each errorItem In ErrorCache
+            ' Добавление ошибки в список
+            errorList.Add errorItem
+        Next errorItem
+    End If
+
+    ' Преобразуем в JSON и сохраняем
+    Dim JsonText As String
+    JsonText = ConvertToJson(errorList)
+    
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    Dim JsonFile As Object
+    Set JsonFile = fso.CreateTextFile("errors.json", True, True)
+    JsonFile.Write JsonText
+    JsonFile.Close
+
+    MsgBox "JSON файл создан. Проверьте окно Immediate для деталей."
+End Sub
+
+Function ConvertToJson(errorList As Collection) As String
+    Dim jsonItems As String
+    Dim i As Long
+    jsonItems = "["
+    
+    For i = 1 To errorList.Count
+        Dim errorData As Scripting.Dictionary
+        Set errorData = errorList(i)
+        
+        jsonItems = jsonItems & "{"
+        jsonItems = jsonItems & """ErrorCode"": " & errorData("ErrorCode") & ","
+        jsonItems = jsonItems & """ErrorLevel"": " & errorData("ErrorLevel") & ","
+        jsonItems = jsonItems & """ErrorCategory"": """ & EscapeJsonString(errorData("ErrorCategory")) & ""","
+        jsonItems = jsonItems & """ErrorMessage"": """ & EscapeJsonString(errorData("ErrorMessage")) & ""","
+        jsonItems = jsonItems & """ErrorOriginalMessage"": """ & EscapeJsonString(errorData("ErrorOriginalMessage")) & ""","
+        jsonItems = jsonItems & """ErrorRecommendation"": """ & EscapeJsonString(errorData("ErrorRecommendation")) & """"
+        jsonItems = jsonItems & "}"
+        
+        If i <> errorList.Count Then
+            jsonItems = jsonItems & ","
+        End If
+    Next i
+    
+    jsonItems = jsonItems & "]"
+    ConvertToJson = jsonItems
+End Function
+
+
+
+Function EscapeJsonString(Value As String) As String
+    If Value = "" Then
+        EscapeJsonString = ""
+        Exit Function
+    End If
+    
+    Value = Replace(Value, "\", "\\")
+    Value = Replace(Value, """", "\""")
+    Value = Replace(Value, vbCrLf, "\n")
+    Value = Replace(Value, vbLf, "\n")
+    Value = Replace(Value, vbCr, "\n")
+    EscapeJsonString = Value
+End Function
+
+Sub TestError()
+    Dim Reporter As New ErrorReporter
+    Reporter.TestErrorReporter
+End Sub
+
+' Процедура для выгрузки всех компонентов VBA в указанную папку
+Sub ExportVBComponents()
+    Dim vbComp As VBComponent
+    Dim exportPath As String
+    Dim folderDialog As FileDialog
+    Dim fileName As String
+    
+    ' Создаем диалоговое окно для выбора папки
+    Set folderDialog = Application.FileDialog(msoFileDialogFolderPicker)
+    folderDialog.Title = "Выберите папку для сохранения компонентов"
+    
+    ' Если пользователь выбрал папку
+    If folderDialog.Show = -1 Then
+        exportPath = folderDialog.SelectedItems(1) & "\"
+        
+        ' Проходим по всем компонентам VBA в проекте
+        For Each vbComp In ThisWorkbook.VBProject.VBComponents
+            ' Определяем имя файла для сохранения
+            fileName = exportPath & vbComp.Name & ".txt"
+            
+            ' Сохраняем компонент в текстовый файл
+            vbComp.Export fileName
+        Next vbComp
+        
+        MsgBox "Все компоненты успешно выгружены в папку: " & exportPath
+    Else
+        MsgBox "Выбор папки отменен."
+    End If
+End Sub
+

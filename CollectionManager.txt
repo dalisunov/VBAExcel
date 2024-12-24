@@ -1,0 +1,279 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "CollectionManager"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
+Option Explicit
+
+' ------------------------------------------------------------------
+' # Объявление типов данных
+' ------------------------------------------------------------------
+
+Private Type Type_CollectionManager
+    Collections As Scripting.Dictionary
+    Collections_Info As Scripting.Dictionary
+    Collections_Metadata As Scripting.Dictionary
+End Type
+
+Private Type Type_Transaction
+    IsActive As Boolean
+    Changes As Collection
+End Type
+
+' ------------------------------------------------------------------
+' # Переменные класса
+' ------------------------------------------------------------------
+
+Private Manager_State As Type_CollectionManager
+Private Transaction_State As Type_Transaction
+
+' ------------------------------------------------------------------
+' # Объявление событий
+' ------------------------------------------------------------------
+
+Public Event OnCollectionChanged(ByVal CollectionName As String)
+Public Event OnMetadataChanged(ByVal CollectionName As String, ByVal Metadata As String)
+Public Event OnCollectionInfoUpdated(ByVal CollectionInfo As CollectionInfo)
+Public Event OnIterationStarted(ByVal CollectionName As String)
+Public Event OnIterationCompleted(ByVal CollectionName As String)
+
+
+' ------------------------------------------------------------------
+' # Инициализация и завершение работы класса
+' ------------------------------------------------------------------
+
+Private Sub Class_Initialize()
+    Set Manager_State.Collections = New Scripting.Dictionary
+    Set Manager_State.Collections_Info = New Scripting.Dictionary
+    Set Manager_State.Collections_Metadata = New Scripting.Dictionary
+    Set Transaction_State.Changes = New Collection
+    Transaction_State.IsActive = False
+End Sub
+
+Private Sub Class_Terminate()
+    Set Manager_State.Collections = Nothing
+    Set Manager_State.Collections_Info = Nothing
+    Set Manager_State.Collections_Metadata = Nothing
+    Set Transaction_State.Changes = Nothing
+End Sub
+
+' ------------------------------------------------------------------
+' # Основные методы работы с коллекциями
+' ------------------------------------------------------------------
+
+' # [Function CreateCollection] - Создание новой коллекции
+Public Function CreateCollection(ByVal CollectionName As String) As Collection
+    If Len(Trim(CollectionName)) = 0 Then Exit Function
+
+    If Not Manager_State.Collections.exists(CollectionName) Then
+        Dim newCollection As New Collection
+        Manager_State.Collections.Add CollectionName, newCollection
+        UpdateCollectionInfo CollectionName, newCollection, "Collection"
+        RaiseEvent OnCollectionChanged(CollectionName)
+        Set CreateCollection = newCollection
+    End If
+End Function
+
+' # [Function AddToCollection] - Добавление элемента в коллекцию
+Public Function AddToCollection(ByVal CollectionName As String, ByVal item As Variant, Optional ByVal ItemKey As Variant) As Boolean
+    If Not Manager_State.Collections.exists(CollectionName) Then Exit Function
+
+    With Manager_State.Collections(CollectionName)
+        If IsMissing(ItemKey) Then
+            .Add item
+        Else
+            .Add item, ItemKey
+        End If
+    End With
+
+    UpdateCollectionInfo CollectionName, Manager_State.Collections(CollectionName), "Collection"
+    RaiseEvent OnCollectionChanged(CollectionName)
+    RaiseEvent OnMetadataChanged(CollectionName, "Collection")
+
+    AddToCollection = True
+End Function
+
+' # [Function GetCollectionNames] - Получение имен всех коллекций
+Public Function GetCollectionNames() As Variant
+    GetCollectionNames = Manager_State.Collections.keys
+End Function
+
+' # [Sub ClearCollection] - Очистка коллекции
+Public Sub ClearCollection(ByVal CollectionName As String)
+    If Not Manager_State.Collections.exists(CollectionName) Then Exit Sub
+
+    Set Manager_State.Collections(CollectionName) = New Collection
+    UpdateCollectionInfo CollectionName, Manager_State.Collections(CollectionName), "Collection"
+    RaiseEvent OnCollectionChanged(CollectionName)
+End Sub
+
+' # [Function GetCollection] - Получение коллекции по имени
+Public Function GetCollection(ByVal CollectionName As String) As Collection
+    If Manager_State.Collections.exists(CollectionName) Then
+        Set GetCollection = Manager_State.Collections(CollectionName)
+    End If
+End Function
+
+' # [Function CollectionExists] - Проверка существования коллекции
+Public Function CollectionExists(ByVal CollectionName As String) As Boolean
+    CollectionExists = Manager_State.Collections.exists(CollectionName)
+End Function
+
+' # [Function GetCollectionCount] - Получение количества коллекций
+Public Function GetCollectionCount() As Long
+    GetCollectionCount = Manager_State.Collections.Count
+End Function
+
+
+' ------------------------------------------------------------------
+' # Методы для работы с информацией о коллекциях
+' ------------------------------------------------------------------
+
+' # [Sub UpdateCollectionInfo] - Обновление информации о коллекции
+Private Sub UpdateCollectionInfo(ByVal CollectionName As String, ByVal Collection As Variant, ByVal CollectionType As String)
+    If CollectionName = "" Then Exit Sub
+
+    Dim Collection_Info As New CollectionInfo
+    With Collection_Info
+        .Name = CollectionName
+        .CollectionType = CollectionType
+        .ItemCount = Collection.Count
+    End With
+
+    If Manager_State.Collections_Info.exists(CollectionName) Then
+        Manager_State.Collections_Info.Remove CollectionName
+    End If
+    Manager_State.Collections_Info.Add CollectionName, Collection_Info
+
+    RaiseEvent OnCollectionInfoUpdated(Collection_Info)
+End Sub
+
+' # [Function GetCollectionInfo] - Получение информации о коллекции
+Public Function GetCollectionInfo(ByVal CollectionName As String) As CollectionInfo
+    If Manager_State.Collections_Info.exists(CollectionName) Then
+        Set GetCollectionInfo = Manager_State.Collections_Info(CollectionName)
+    End If
+End Function
+
+
+' ------------------------------------------------------------------
+' # Методы для работы с итераторами
+' ------------------------------------------------------------------
+
+' # [Function CreateCollectionIterator] - Создание итератора для коллекции
+Public Function CreateCollectionIterator(ByVal CollectionName As String) As CollectionIterator
+    If Not Manager_State.Collections.exists(CollectionName) Then Exit Function
+
+    Dim Collection_Iterator As New CollectionIterator
+    Set Collection_Iterator.Collection = Manager_State.Collections(CollectionName)
+    RaiseEvent OnIterationStarted(CollectionName)
+    Set CreateCollectionIterator = Collection_Iterator
+    RaiseEvent OnIterationCompleted(CollectionName) 'Добавим событие завершения итерации, как только он создан.
+End Function
+
+
+' ------------------------------------------------------------------
+' # Методы для работы с метаданными
+' ------------------------------------------------------------------
+
+' # [Function GetCollectionMetadata] - Получение метаданных коллекции
+Public Function GetCollectionMetadata(ByVal CollectionName As String) As CollectionMetadata
+    If Not Manager_State.Collections.exists(CollectionName) Then Exit Function
+
+    Dim Collection_Metadata As New CollectionMetadata
+    With Collection_Metadata
+        .Name = CollectionName
+        .ItemCount = Manager_State.Collections(CollectionName).Count
+        .LastModified = Now
+    End With
+
+    Set GetCollectionMetadata = Collection_Metadata
+End Function
+
+
+' ------------------------------------------------------------------
+' # Методы для работы с элементами коллекции
+' ------------------------------------------------------------------
+
+' # [Function GetCollectionItems] - Получение всех элементов коллекции
+Public Function GetCollectionItems(ByVal CollectionName As String) As Variant()
+    If Not Manager_State.Collections.exists(CollectionName) Then Exit Function
+
+    Dim CurrentCollection As Collection
+    Set CurrentCollection = Manager_State.Collections(CollectionName)
+
+    Dim ResultArray() As Variant
+    ReDim ResultArray(1 To CurrentCollection.Count)
+
+    Dim ItemIndex As Long
+    For ItemIndex = 1 To CurrentCollection.Count
+        If IsObject(CurrentCollection(ItemIndex)) Then
+            Set ResultArray(ItemIndex) = CurrentCollection(ItemIndex)
+        Else
+            ResultArray(ItemIndex) = CurrentCollection(ItemIndex)
+        End If
+    Next ItemIndex
+
+    GetCollectionItems = ResultArray
+End Function
+
+
+' ------------------------------------------------------------------
+' # Методы для работы с транзакциями
+' ------------------------------------------------------------------
+
+' # [Sub BeginTransaction] - Начало транзакции
+Public Sub BeginTransaction()
+    If Transaction_State.IsActive Then Exit Sub
+    Set Transaction_State.Changes = New Collection
+    Transaction_State.IsActive = True
+End Sub
+
+' # [Sub CommitTransaction] - Завершение транзакции (фиксация изменений)
+Public Sub CommitTransaction()
+    If Not Transaction_State.IsActive Then Exit Sub
+    ApplyTransactionChanges
+    Transaction_State.IsActive = False
+End Sub
+
+' # [Sub RollbackTransaction] - Отмена транзакции
+Public Sub RollbackTransaction()
+    If Not Transaction_State.IsActive Then Exit Sub
+    Set Transaction_State.Changes = New Collection
+    Transaction_State.IsActive = False
+End Sub
+
+' # [Sub ApplyTransactionChanges] - Применение изменений из транзакции
+Private Sub ApplyTransactionChanges()
+    Dim TransactionOperation As Variant
+    For Each TransactionOperation In Transaction_State.Changes
+        ProcessTransactionOperation TransactionOperation
+    Next TransactionOperation
+End Sub
+
+' # [Sub ProcessTransactionOperation] - Обработка отдельной операции транзакции
+Private Sub ProcessTransactionOperation(ByVal Operation As Variant)
+    Select Case Operation("OperationType")
+        Case "ADD_ITEM"
+            AddToCollection Operation("CollectionName"), Operation("Item")
+        Case "CLEAR_COLLECTION"
+            ClearCollection Operation("CollectionName")
+    End Select
+End Sub
+
+' ------------------------------------------------------------------
+' # Методы для удаления коллекций
+' ------------------------------------------------------------------
+
+' # [Sub RemoveCollection] - Удаление коллекции
+Public Sub RemoveCollection(ByVal CollectionName As String)
+    If Manager_State.Collections.exists(CollectionName) Then
+        Manager_State.Collections.Remove CollectionName
+        Manager_State.Collections_Info.Remove CollectionName
+        RaiseEvent OnCollectionChanged(CollectionName)
+    End If
+End Sub

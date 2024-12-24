@@ -1,0 +1,635 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "TestFramework"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
+
+Option Explicit
+
+' ------------------------------------------------------------------
+' # Типы данных для тестирования
+' ------------------------------------------------------------------
+Private Type TestCase
+    TestName As String
+    Category As String
+    Priority As Integer
+    ExpectedDuration As Double
+    ActualDuration As Double
+    Status As String
+    ErrorMessage As String
+    StackTrace As String
+End Type
+
+Private Type testSuite
+    Name As String
+    TotalTests As Long
+    PassedTests As Long
+    FailedTests As Long
+    SkippedTests As Long
+    startTime As Date
+    EndTime As Date
+    IsRunning As Boolean
+End Type
+
+' ------------------------------------------------------------------
+' # Перечисления
+' ------------------------------------------------------------------
+Private Enum TestPriority
+    PriorityLow = 1
+    PriorityMedium = 2
+    PriorityHigh = 3
+    PriorityCritical = 4
+End Enum
+
+Private Enum TestStatus
+    StatusNotRun = 0
+    StatusRunning = 1
+    StatusPassed = 2
+    StatusFailed = 3
+    StatusSkipped = 4
+End Enum
+
+' ------------------------------------------------------------------
+' # Переменные класса
+' ------------------------------------------------------------------
+Private BaseManager As BaseManager
+Private ErrorReporter As ErrorReporter
+Private testSuite As testSuite
+Private testCases As Collection
+Private testResults As Collection
+Private currentTest As TestCase
+
+' ------------------------------------------------------------------
+' # События
+' ------------------------------------------------------------------
+Public Event OnTestStarted(ByVal TestName As String)
+Public Event OnTestCompleted(ByVal TestName As String, ByVal Status As String)
+Public Event OnSuiteCompleted(ByVal summary As String)
+Public Event OnTestError(ByVal TestName As String, ByVal ErrorMessage As String)
+
+' ------------------------------------------------------------------
+' # Инициализация
+' ------------------------------------------------------------------
+Private Sub Class_Initialize()
+    Set BaseManager = New BaseManager
+    Set ErrorReporter = New ErrorReporter
+    Set testCases = New Collection
+    Set testResults = New Collection
+    InitializeTestSuite
+End Sub
+
+Private Sub InitializeTestSuite()
+    With testSuite
+        .Name = "Complete System Test Suite"
+        .TotalTests = 0
+        .PassedTests = 0
+        .FailedTests = 0
+        .SkippedTests = 0
+        .IsRunning = False
+    End With
+End Sub
+
+' ------------------------------------------------------------------
+' # Методы регистрации тестов
+' ------------------------------------------------------------------
+Public Sub RegisterTest(ByVal TestName As String, ByVal Category As String, _
+                       ByVal Priority As TestPriority)
+    Dim newTest As TestCase
+    
+    With newTest
+        .TestName = TestName
+        .Category = Category
+        .Priority = Priority
+        .Status = StatusNotRun
+    End With
+    
+    testCases.Add newTest
+    testSuite.TotalTests = testSuite.TotalTests + 1
+End Sub
+
+Public Sub RegisterWorksheetTests()
+    ' Тесты для операций с листами
+    RegisterTest "Test_Worksheet_Creation", "Worksheet", PriorityHigh
+    RegisterTest "Test_Worksheet_Deletion", "Worksheet", PriorityHigh
+    RegisterTest "Test_Worksheet_Rename", "Worksheet", PriorityMedium
+    RegisterTest "Test_Worksheet_Protection", "Worksheet", PriorityHigh
+    RegisterTest "Test_Worksheet_Visibility", "Worksheet", PriorityMedium
+    
+    ' Тесты для работы с данными
+    RegisterTest "Test_Data_Import", "Data", PriorityCritical
+    RegisterTest "Test_Data_Export", "Data", PriorityCritical
+    RegisterTest "Test_Data_Validation", "Data", PriorityHigh
+    RegisterTest "Test_Data_Formatting", "Data", PriorityMedium
+    RegisterTest "Test_Data_Sorting", "Data", PriorityMedium
+    
+    ' Тесты для формул и вычислений
+    RegisterTest "Test_Formula_Basic", "Formulas", PriorityHigh
+    RegisterTest "Test_Formula_Array", "Formulas", PriorityHigh
+    RegisterTest "Test_Formula_Volatile", "Formulas", PriorityMedium
+    RegisterTest "Test_Formula_References", "Formulas", PriorityHigh
+    RegisterTest "Test_Formula_Names", "Formulas", PriorityMedium
+    
+    ' Тесты для диаграмм
+    RegisterTest "Test_Chart_Creation", "Charts", PriorityMedium
+    RegisterTest "Test_Chart_Formatting", "Charts", PriorityLow
+    RegisterTest "Test_Chart_DataUpdate", "Charts", PriorityMedium
+    RegisterTest "Test_Chart_Export", "Charts", PriorityLow
+    
+    ' Тесты для таблиц
+    RegisterTest "Test_Table_Creation", "Tables", PriorityHigh
+    RegisterTest "Test_Table_DataManipulation", "Tables", PriorityHigh
+    RegisterTest "Test_Table_Formatting", "Tables", PriorityMedium
+    RegisterTest "Test_Table_Formulas", "Tables", PriorityHigh
+    RegisterTest "Test_Table_Export", "Tables", PriorityMedium
+    
+    ' Тесты для производительности
+    RegisterTest "Test_Performance_LargeDataSet", "Performance", PriorityCritical
+    RegisterTest "Test_Performance_Calculations", "Performance", PriorityCritical
+    RegisterTest "Test_Performance_Formatting", "Performance", PriorityHigh
+    RegisterTest "Test_Performance_Charts", "Performance", PriorityHigh
+    
+    ' Тесты для обработки ошибок
+    RegisterTest "Test_Error_InvalidFormulas", "ErrorHandling", PriorityHigh
+    RegisterTest "Test_Error_DataValidation", "ErrorHandling", PriorityHigh
+    RegisterTest "Test_Error_Protection", "ErrorHandling", PriorityHigh
+    RegisterTest "Test_Error_References", "ErrorHandling", PriorityHigh
+End Sub
+
+' ------------------------------------------------------------------
+' # Методы выполнения тестов
+' ------------------------------------------------------------------
+Public Function RunAllTests() As Boolean
+    On Error GoTo ErrorHandler
+    
+    testSuite.startTime = Now
+    testSuite.IsRunning = True
+    
+    Dim test As Variant
+    For Each test In testCases
+        If Not RunSingleTest(test) Then
+            ' Продолжаем выполнение остальных тестов даже при ошибке
+            testSuite.FailedTests = testSuite.FailedTests + 1
+        End If
+    Next test
+    
+    testSuite.EndTime = Now
+    testSuite.IsRunning = False
+    
+    ' Генерация и отправка итогового отчета
+    GenerateTestReport
+    RaiseEvent OnSuiteCompleted(GetTestSummary())
+    
+    RunAllTests = True
+    Exit Function
+    
+ErrorHandler:
+    ErrorReporter.ProcessError Err.Number
+    RunAllTests = False
+End Function
+
+Private Function RunSingleTest(ByRef test As TestCase) As Boolean
+    On Error GoTo ErrorHandler
+    
+    Dim startTime As Double
+    startTime = Timer
+    
+    ' Уведомление о начале теста
+    RaiseEvent OnTestStarted(test.TestName)
+    
+    ' Выполнение теста в зависимости от категории
+    Select Case test.Category
+        Case "Worksheet"
+            RunWorksheetTest test
+        Case "Data"
+            RunDataTest test
+        Case "Formulas"
+            RunFormulaTest test
+        Case "Charts"
+            RunChartTest test
+        Case "Tables"
+            RunTableTest test
+        Case "Performance"
+            RunPerformanceTest test
+        Case "ErrorHandling"
+            RunErrorHandlingTest test
+    End Select
+    
+    ' Расчет длительности выполнения
+    test.ActualDuration = Timer - startTime
+    
+    ' Обновление статистики
+    testSuite.PassedTests = testSuite.PassedTests + 1
+    
+    ' Уведомление о завершении теста
+    RaiseEvent OnTestCompleted(test.TestName, "PASSED")
+    
+    RunSingleTest = True
+    Exit Function
+    
+ErrorHandler:
+    test.Status = StatusFailed
+    test.ErrorMessage = Err.Description
+    test.StackTrace = GetCallStack()
+    RaiseEvent OnTestError(test.TestName, Err.Description)
+    RunSingleTest = False
+End Function
+
+' ------------------------------------------------------------------
+' # Специализированные тестовые методы
+' ------------------------------------------------------------------
+Private Sub RunWorksheetTest(ByRef test As TestCase)
+    Select Case test.TestName
+        Case "Test_Worksheet_Creation"
+            TestWorksheetCreation
+        Case "Test_Worksheet_Deletion"
+            TestWorksheetDeletion
+        Case "Test_Worksheet_Rename"
+            TestWorksheetRename
+        Case "Test_Worksheet_Protection"
+            TestWorksheetProtection
+        Case "Test_Worksheet_Visibility"
+            TestWorksheetVisibility
+    End Select
+End Sub
+
+Private Sub RunDataTest(ByRef test As TestCase)
+    Select Case test.TestName
+        Case "Test_Data_Import"
+            TestDataImport
+        Case "Test_Data_Export"
+            TestDataExport
+        Case "Test_Data_Validation"
+            TestDataValidation
+        Case "Test_Data_Formatting"
+            TestDataFormatting
+        Case "Test_Data_Sorting"
+            TestDataSorting
+    End Select
+End Sub
+
+Private Sub RunFormulaTest(ByRef test As TestCase)
+    Select Case test.TestName
+        Case "Test_Formula_Basic"
+            TestFormulaBasic
+        Case "Test_Formula_Array"
+            TestFormulaArray
+        Case "Test_Formula_Volatile"
+            TestFormulaVolatile
+        Case "Test_Formula_References"
+            TestFormulaReferences
+        Case "Test_Formula_Names"
+            TestFormulaNames
+    End Select
+End Sub
+
+' ------------------------------------------------------------------
+' # Вспомогательные методы
+' ------------------------------------------------------------------
+Private Function GetCallStack() As String
+    ' Здесь можно реализовать получение стека вызовов
+    GetCallStack = "Stack trace functionality to be implemented"
+End Function
+
+Private Function GetTestSummary() As String
+    Dim summary As String
+    With testSuite
+        summary = "Test Suite: " & .Name & vbCrLf & _
+                 "Total Tests: " & .TotalTests & vbCrLf & _
+                 "Passed: " & .PassedTests & vbCrLf & _
+                 "Failed: " & .FailedTests & vbCrLf & _
+                 "Skipped: " & .SkippedTests & vbCrLf & _
+                 "Duration: " & Format$(.EndTime - .startTime, "hh:mm:ss")
+    End With
+    GetTestSummary = summary
+End Function
+
+Private Sub GenerateTestReport()
+    ' Создание подробного отчета о тестировании
+    Dim report As String
+    
+    ' Заголовок отчета
+    report = String(50, "=") & vbCrLf & _
+            "TEST EXECUTION REPORT" & vbCrLf & _
+            String(50, "=") & vbCrLf & vbCrLf
+            
+    ' Общая информация
+    report = report & "Suite: " & testSuite.Name & vbCrLf & _
+            "Start Time: " & Format$(testSuite.startTime, "yyyy-mm-dd hh:mm:ss") & vbCrLf & _
+            "End Time: " & Format$(testSuite.EndTime, "yyyy-mm-dd hh:mm:ss") & vbCrLf & vbCrLf
+            
+    ' Статистика
+    report = report & "STATISTICS" & vbCrLf & _
+            String(20, "-") & vbCrLf & _
+            "Total Tests: " & testSuite.TotalTests & vbCrLf & _
+            "Passed: " & testSuite.PassedTests & vbCrLf & _
+            "Failed: " & testSuite.FailedTests & vbCrLf & _
+            "Skipped: " & testSuite.SkippedTests & vbCrLf & vbCrLf
+            
+    ' Детали тестов
+    report = report & "TEST DETAILS" & vbCrLf & _
+            String(20, "-") & vbCrLf
+            
+    Dim test As Variant
+    For Each test In testCases
+        report = report & _
+                "Test: " & test.TestName & vbCrLf & _
+                "Category: " & test.Category & vbCrLf & _
+                "Priority: " & test.Priority & vbCrLf & _
+                "Status: " & test.Status & vbCrLf & _
+                "Duration: " & Format$(test.ActualDuration, "0.000") & " seconds" & vbCrLf
+        
+        If test.Status = StatusFailed Then
+            report = report & _
+                    "Error: " & test.ErrorMessage & vbCrLf & _
+                    "Stack Trace: " & test.StackTrace & vbCrLf
+        End If
+        
+        report = report & String(20, "-") & vbCrLf
+    Next test
+    
+    ' Сохранение отчета
+    SaveTestReport report
+End Sub
+
+Private Sub SaveTestReport(ByVal report As String)
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    
+    Dim reportPath As String
+    reportPath = ThisWorkbook.path & "\TestReports"
+    
+    ' Создание папки для отчетов, если её нет
+    If Not fso.FolderExists(reportPath) Then
+        fso.CreateFolder reportPath
+    End If
+    
+    ' Сохранение отчета
+    Dim reportFile As Object
+    Set reportFile = fso.CreateTextFile(reportPath & "\TestReport_" & _
+                    Format$(Now, "yyyymmdd_hhmmss") & ".txt", True)
+    
+    reportFile.Write report
+    reportFile.Close
+End Sub
+
+' ------------------------------------------------------------------
+' # Методы для доступа к результатам
+' ------------------------------------------------------------------
+Public Function GetTestResults() As Collection
+    Set GetTestResults = testResults
+End Function
+
+Public Function GetTestCaseByName(ByVal TestName As String) As TestCase
+    Dim test As Variant
+    For Each test In testCases
+        If test.TestName = TestName Then
+            GetTestCaseByName = test
+            Exit Function
+        End If
+    Next test
+End Function
+
+' ------------------------------------------------------------------
+' # Реализация тестов для таблиц
+' ------------------------------------------------------------------
+Private Sub RunTableTest(ByRef test As TestCase)
+    Select Case test.TestName
+        Case "Test_Table_Creation"
+            TestTableCreation
+        Case "Test_Table_DataManipulation"
+            TestTableDataManipulation
+        Case "Test_Table_Formatting"
+            TestTableFormatting
+        Case "Test_Table_Formulas"
+            TestTableFormulas
+        Case "Test_Table_Export"
+            TestTableExport
+    End Select
+End Sub
+
+Private Sub TestTableCreation()
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets.Add
+    
+    On Error GoTo ErrorHandler
+    
+    ' Подготовка тестовых данных
+    Dim testData() As Variant
+    ReDim testData(1 To 5, 1 To 3)
+    Dim i As Long, j As Long
+    For i = 1 To 5
+        For j = 1 To 3
+            testData(i, j) = "Data_" & i & "_" & j
+        Next j
+    Next i
+    
+    ' Создание диапазона данных
+    ws.Range("A1:C6").Value = testData
+    
+    ' Тест 1: Создание таблицы
+    Dim tbl As ListObject
+    Set tbl = ws.ListObjects.Add(xlSrcRange, ws.Range("A1:C6"), , xlYes)
+    
+    If tbl Is Nothing Then
+        Err.Raise vbObjectError + 1, "TestTableCreation", "Failed to create table"
+    End If
+    
+    ' Тест 2: Проверка структуры таблицы
+    If tbl.ListRows.Count <> 5 Or tbl.ListColumns.Count <> 3 Then
+        Err.Raise vbObjectError + 2, "TestTableCreation", "Table structure is incorrect"
+    End If
+    
+    ' Тест 3: Проверка имени таблицы
+    Dim tableName As String
+    tableName = "TestTable_" & Format(Now, "yyyymmddhhmmss")
+    tbl.Name = tableName
+    
+    If tbl.Name <> tableName Then
+        Err.Raise vbObjectError + 3, "TestTableCreation", "Failed to set table name"
+    End If
+    
+CleanUp:
+    Application.DisplayAlerts = False
+    ws.Delete
+    Application.DisplayAlerts = True
+    Exit Sub
+    
+ErrorHandler:
+    Dim errMsg As String
+    errMsg = "Error in TestTableCreation: " & Err.Description
+    Resume CleanUp
+End Sub
+
+Private Sub TestTableDataManipulation()
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets.Add
+    
+    On Error GoTo ErrorHandler
+    
+    ' Создание тестовой таблицы
+    Dim tbl As ListObject
+    ws.Range("A1:C1").Value = Array("ID", "Name", "Value")
+    Set tbl = ws.ListObjects.Add(xlSrcRange, ws.Range("A1:C1").Resize(1), , xlYes)
+    
+    ' Тест 1: Добавление строки
+    Dim newRow As ListRow
+    Set newRow = tbl.ListRows.Add
+    With newRow.Range
+        .Cells(1).Value = 1
+        .Cells(2).Value = "Test"
+        .Cells(3).Value = 100
+    End With
+    
+    If tbl.ListRows.Count <> 1 Then
+        Err.Raise vbObjectError + 4, "TestTableDataManipulation", "Failed to add row"
+    End If
+    
+    ' Тест 2: Обновление данных
+    tbl.ListRows(1).Range.Cells(2).Value = "Updated"
+    If tbl.ListRows(1).Range.Cells(2).Value <> "Updated" Then
+        Err.Raise vbObjectError + 5, "TestTableDataManipulation", "Failed to update data"
+    End If
+    
+    ' Тест 3: Удаление строки
+    tbl.ListRows(1).Delete
+    If tbl.ListRows.Count <> 0 Then
+        Err.Raise vbObjectError + 6, "TestTableDataManipulation", "Failed to delete row"
+    End If
+    
+CleanUp:
+    Application.DisplayAlerts = False
+    ws.Delete
+    Application.DisplayAlerts = True
+    Exit Sub
+    
+ErrorHandler:
+    Dim errMsg As String
+    errMsg = "Error in TestTableDataManipulation: " & Err.Description
+    Resume CleanUp
+End Sub
+
+' ------------------------------------------------------------------
+' # Реализация тестов для диаграмм
+' ------------------------------------------------------------------
+Private Sub RunChartTest(ByRef test As TestCase)
+    Select Case test.TestName
+        Case "Test_Chart_Creation"
+            TestChartCreation
+        Case "Test_Chart_Formatting"
+            TestChartFormatting
+        Case "Test_Chart_DataUpdate"
+            TestChartDataUpdate
+        Case "Test_Chart_Export"
+            TestChartExport
+    End Select
+End Sub
+
+Private Sub TestChartCreation()
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets.Add
+    
+    On Error GoTo ErrorHandler
+    
+    ' Подготовка тестовых данных
+    ws.Range("A1:B4").Value = Array("Category", "Value", "A", 10, "B", 20, "C", 30)
+    
+    ' Тест 1: Создание базовой диаграммы
+    Dim cht As Chart
+    Set cht = ws.Shapes.AddChart2(201, xlColumn).Chart
+    
+    If cht Is Nothing Then
+        Err.Raise vbObjectError + 7, "TestChartCreation", "Failed to create chart"
+    End If
+    
+    ' Тест 2: Настройка источника данных
+    cht.SetSourceData Source:=ws.Range("A1:B4")
+    
+    ' Тест 3: Проверка серий данных
+    If cht.SeriesCollection.Count <> 1 Then
+        Err.Raise vbObjectError + 8, "TestChartCreation", "Incorrect series count"
+    End If
+    
+CleanUp:
+    Application.DisplayAlerts = False
+    ws.Delete
+    Application.DisplayAlerts = True
+    Exit Sub
+    
+ErrorHandler:
+    Dim errMsg As String
+    errMsg = "Error in TestChartCreation: " & Err.Description
+    Resume CleanUp
+End Sub
+
+' ------------------------------------------------------------------
+' # Реализация тестов производительности
+' ------------------------------------------------------------------
+Private Sub RunPerformanceTest(ByRef test As TestCase)
+    Select Case test.TestName
+        Case "Test_Performance_LargeDataSet"
+            TestPerformanceLargeDataSet
+        Case "Test_Performance_Calculations"
+            TestPerformanceCalculations
+        Case "Test_Performance_Formatting"
+            TestPerformanceFormatting
+        Case "Test_Performance_Charts"
+            TestPerformanceCharts
+    End Select
+End Sub
+
+Private Sub TestPerformanceLargeDataSet()
+    Dim ws As Worksheet
+    Set ws = ThisWorkbook.Worksheets.Add
+    
+    On Error GoTo ErrorHandler
+    
+    ' Подготовка теста
+    Application.ScreenUpdating = False
+    Application.Calculation = xlCalculationManual
+    
+    ' Тест 1: Запись большого объема данных
+    Const ROWS_COUNT As Long = 10000
+    Const COLS_COUNT As Long = 10
+    
+    Dim startTime As Double
+    startTime = Timer
+    
+    Dim testData() As Variant
+    ReDim testData(1 To ROWS_COUNT, 1 To COLS_COUNT)
+    
+    Dim i As Long, j As Long
+    For i = 1 To ROWS_COUNT
+        For j = 1 To COLS_COUNT
+            testData(i, j) = "Data_" & i & "_" & j
+        Next j
+    Next i
+    
+    ws.Range("A1").Resize(ROWS_COUNT, COLS_COUNT).Value = testData
+    
+    Dim duration As Double
+    duration = Timer - startTime
+    
+    ' Проверка производительности
+    If duration > 10 Then ' Если выполнение заняло больше 10 секунд
+        Err.Raise vbObjectError + 9, "TestPerformanceLargeDataSet", _
+                "Performance test failed: Duration = " & Format(duration, "0.00") & " seconds"
+    End If
+    
+CleanUp:
+    Application.Calculation = xlCalculationAutomatic
+    Application.ScreenUpdating = True
+    Application.DisplayAlerts = False
+    ws.Delete
+    Application.DisplayAlerts = True
+    Exit Sub
+    
+ErrorHandler:
+    Dim errMsg As String
+    errMsg = "Error in TestPerformanceLargeDataSet: " & Err.Description
+    Resume CleanUp
+End Sub
+

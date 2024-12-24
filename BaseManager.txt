@@ -1,0 +1,213 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "BaseManager"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
+' # BaseManager.cls
+
+
+Option Explicit
+
+' ------------------------------------------------------------------
+' # Объявление типов данных
+' ------------------------------------------------------------------
+
+Private Type Type_BaseManager
+    Cache As Scripting.Dictionary
+    Error_Log As Collection
+    Is_Debug_Mode As Boolean
+End Type
+
+Private Type Type_CacheItem
+    Value As Variant
+    Created_Time As Date
+    Last_Access As Date
+    Access_Count As Long
+End Type
+
+' ------------------------------------------------------------------
+' # Переменные класса
+' ------------------------------------------------------------------
+
+Private Manager_State As Type_BaseManager
+
+' ------------------------------------------------------------------
+' # Объявление событий
+' ------------------------------------------------------------------
+Private colLogs As CollectionManager
+Public Event OnError(ByVal ErrorMessage As String)
+Public Event OnCacheUpdated(ByVal CacheKey As String)
+Public Event OnLogUpdated(ByVal logMessage As String)
+
+' ------------------------------------------------------------------
+' # Инициализация и завершение работы класса
+' ------------------------------------------------------------------
+
+Private Sub Class_Initialize()
+    Set Manager_State.Cache = New Scripting.Dictionary
+    Set Manager_State.Error_Log = New Collection
+    Manager_State.Is_Debug_Mode = False
+    
+    ' Инициализация CollectionManager для логов
+    Set colLogs = New CollectionManager
+    colLogs.CreateCollection "LogEntries"
+End Sub
+
+
+
+Private Sub Class_Terminate()
+    Set Manager_State.Cache = Nothing
+    Set Manager_State.Error_Log = Nothing
+End Sub
+
+' ------------------------------------------------------------------
+' # Методы работы с кешем
+' ------------------------------------------------------------------
+
+' # [Sub UpdateCache] - Процедура обновления данных в кеше
+Public Sub UpdateCache(ByVal CacheKey As String, ByVal CacheValue As Variant)
+    Dim Cache_Dictionary As Scripting.Dictionary
+    Set Cache_Dictionary = New Scripting.Dictionary
+
+    Cache_Dictionary.Add "Value", CacheValue
+    Cache_Dictionary.Add "Created_Time", Now
+    Cache_Dictionary.Add "Last_Access", Now
+    Cache_Dictionary.Add "Access_Count", 0
+
+    If Manager_State.Cache.exists(CacheKey) Then
+        Manager_State.Cache.Remove CacheKey
+    End If
+
+    Manager_State.Cache.Add CacheKey, Cache_Dictionary
+    RaiseEvent OnCacheUpdated(CacheKey)
+End Sub
+
+' # [Function GetFromCache] - Функция получения данных из кеша
+Public Function GetFromCache(ByVal CacheKey As String) As Variant
+    If Not Manager_State.Cache.exists(CacheKey) Then Exit Function
+
+    Dim Cache_Dictionary As Scripting.Dictionary
+    Set Cache_Dictionary = Manager_State.Cache(CacheKey)
+
+    Cache_Dictionary("Last_Access") = Now
+    Cache_Dictionary("Access_Count") = Cache_Dictionary("Access_Count") + 1
+
+    If IsObject(Cache_Dictionary("Value")) Then
+        Set GetFromCache = Cache_Dictionary("Value")
+    Else
+        GetFromCache = Cache_Dictionary("Value")
+    End If
+End Function
+
+' # [Sub ClearCache] - Процедура очистки кеша
+Public Sub ClearCache()
+    Set Manager_State.Cache = New Scripting.Dictionary
+End Sub
+
+' # [Function GetCacheKeys] - Функция получения ключей кеша
+Public Function GetCacheKeys() As Variant()
+    GetCacheKeys = Manager_State.Cache.keys
+End Function
+
+' # [Function GetCacheStatistics] - Функция получения статистики кеша
+Public Function GetCacheStatistics() As String
+    Dim stats As String
+    stats = "Cache Items: " & Manager_State.Cache.Count & vbCrLf
+    stats = stats & "Error Log Items: " & Manager_State.Error_Log.Count & vbCrLf
+    stats = stats & "Debug Mode: " & Manager_State.Is_Debug_Mode
+    GetCacheStatistics = stats
+End Function
+
+
+' ------------------------------------------------------------------
+' # Методы работы с логированием
+' ------------------------------------------------------------------
+
+Public Sub LogError(ByVal ErrorMessage As String)
+    Manager_State.Error_Log.Add Now & " - ERROR: " & ErrorMessage
+    
+    ' Добавление записи в CollectionManager
+    Dim logDict As Scripting.Dictionary
+    Set logDict = New Scripting.Dictionary
+    logDict.Add "Timestamp", Now
+    logDict.Add "Level", "ERROR"
+    logDict.Add "Message", ErrorMessage
+    colLogs.AddToCollection "LogEntries", logDict
+    
+    RaiseEvent OnError(ErrorMessage)
+    RaiseEvent OnLogUpdated(ErrorMessage)
+End Sub
+
+Public Sub LogInfo(ByVal InfoMessage As String)
+    If Manager_State.Is_Debug_Mode Then
+        Manager_State.Error_Log.Add Now & " - INFO: " & InfoMessage
+        
+        ' Добавление записи в CollectionManager
+        Dim logDict As Scripting.Dictionary
+        Set logDict = New Scripting.Dictionary
+        logDict.Add "Timestamp", Now
+        logDict.Add "Level", "INFO"
+        logDict.Add "Message", InfoMessage
+        colLogs.AddToCollection "LogEntries", logDict
+        
+        RaiseEvent OnLogUpdated(InfoMessage)
+    End If
+End Sub
+
+' ------------------------------------------------------------------
+' # Методы работы с логами ошибок
+' ------------------------------------------------------------------
+
+' # [Function GetErrorLog] - Функция получения лога ошибок
+Public Function GetErrorLog() As Collection
+    Set GetErrorLog = Manager_State.Error_Log
+End Function
+
+' # [Sub ClearErrorLog] - Процедура очистки лога ошибок
+Public Sub ClearErrorLog()
+    Set Manager_State.Error_Log = New Collection
+End Sub
+
+' # [Function GetLastError] - Функция получения последней ошибки
+Public Function GetLastError() As String
+    If Manager_State.Error_Log.Count > 0 Then
+        GetLastError = Manager_State.Error_Log(Manager_State.Error_Log.Count)
+    End If
+End Function
+
+' # [Function GetErrorCount] - Функция получения количества ошибок
+Public Function GetErrorCount() As Long
+    GetErrorCount = Manager_State.Error_Log.Count
+End Function
+
+' ------------------------------------------------------------------
+' # Методы управления режимом отладки
+' ------------------------------------------------------------------
+
+' # [Property Let DebugMode] - Установка режима отладки
+Public Property Let DebugMode(ByVal Value As Boolean)
+    Manager_State.Is_Debug_Mode = Value
+End Property
+
+' # [Property Get DebugMode] - Получение режима отладки
+Public Property Get DebugMode() As Boolean
+    DebugMode = Manager_State.Is_Debug_Mode
+End Property
+
+' ------------------------------------------------------------------
+' # Методы валидации параметров
+' ------------------------------------------------------------------
+
+' # [Function ValidateParameter] - Функция валидации параметров
+Public Function ValidateParameter(ByVal Parameter As Variant, ByVal ParameterName As String) As Boolean
+    If IsEmpty(Parameter) Or IsMissing(Parameter) Then
+        LogError "Параметр " & ParameterName & " не может быть пустым"
+        ValidateParameter = False
+        Exit Function
+    End If
+    ValidateParameter = True
+End Function

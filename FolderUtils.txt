@@ -1,0 +1,333 @@
+Attribute VB_Name = "FolderUtils"
+' Модуль: FolderUtils
+
+Option Explicit
+
+
+' 1. Выбор папки в окне диалога
+Public Function SelectFolder(Optional ByVal DialogTitle As String = "Выберите папку") As String
+    Dim objShell As Object
+    Dim objFolder As Object
+    Set objShell = CreateObject("Shell.Application")
+    Set objFolder = objShell.BrowseForFolder(0, DialogTitle, &H1)
+    If Not objFolder Is Nothing Then
+        SelectFolder = objFolder.self.path
+    Else
+        SelectFolder = ""
+    End If
+End Function
+
+' 2. Получение пути к папке с текущей книгой
+Public Function GetCurrentWorkbookPath() As String
+    GetCurrentWorkbookPath = ThisWorkbook.path
+End Function
+
+' 3. Получение пути к папке текущего пользователя
+Public Function GetUserFolderPath() As String
+    GetUserFolderPath = Environ("USERPROFILE")
+End Function
+
+' 4. Получение пути к папке автосохранения Excel
+Public Function GetExcelAutoSavePath() As String
+    GetExcelAutoSavePath = Application.AutoRecover.path
+End Function
+
+' 5. Получение пути к папке с Office
+Public Function GetOfficeFolderPath() As String
+    GetOfficeFolderPath = Application.path
+End Function
+
+' 6. Получение пути к рабочему столу
+Public Function GetDesktopPath() As String
+    GetDesktopPath = CreateObject("WScript.Shell").SpecialFolders("Desktop")
+End Function
+
+' 7. Получение пути к "Документам"
+Public Function GetDocumentsPath() As String
+    GetDocumentsPath = CreateObject("WScript.Shell").SpecialFolders("MyDocuments")
+End Function
+
+' 8. Получение пути к "Загрузкам"
+Public Function GetDownloadsPath() As String
+    GetDownloadsPath = Environ("USERPROFILE") & "\Downloads"
+End Function
+
+' 9. Получение пути к папке Temp
+Public Function GetTempPath() As String
+    GetTempPath = Environ("TEMP")
+End Function
+
+' 10. Получение коллекции ссылок на избранные папки
+Public Function GetFavoritesPaths() As Collection
+    Dim colFavorites As New Collection
+    Dim fso As Object
+    Dim folderPath As String
+    Dim folder As Object
+    Dim subFolder As Object
+
+    folderPath = CreateObject("WScript.Shell").SpecialFolders("Favorites")
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    Set folder = fso.GetFolder(folderPath)
+
+    For Each subFolder In folder.SubFolders
+        colFavorites.Add subFolder.path
+    Next subFolder
+
+    Set GetFavoritesPaths = colFavorites
+End Function
+
+' 11. Получение имени целевой папки и родительских папок
+Public Function GetFolderNameAndParents(ByVal folderPath As String) As Collection
+    Dim colFolders As New Collection
+    Dim fso As Object
+    Dim folder As Object
+
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If fso.FolderExists(folderPath) Then
+        Set folder = fso.GetFolder(folderPath)
+        Do Until folder Is Nothing
+            colFolders.Add folder.Name
+            Set folder = folder.ParentFolder
+        Loop
+    Else
+        Set colFolders = Nothing
+    End If
+
+    Set GetFolderNameAndParents = colFolders
+End Function
+
+' 12. Проверка, является ли строка ссылкой на каталог
+Public Function IsFolderPath(ByVal path As String) As Boolean
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    IsFolderPath = fso.FolderExists(path)
+End Function
+
+' 13. Проверка существования объекта каталога
+Public Function FolderExists(ByVal folderPath As String) As Boolean
+    FolderExists = IsFolderPath(folderPath)
+End Function
+
+' 14. Проверка доступности изменения
+Public Function CanModify(ByVal path As String) As Boolean
+    On Error GoTo ErrHandler
+    Dim fso As Object
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    Dim testFile As String
+    testFile = fso.BuildPath(path, "test.txt")
+    Dim txtStream As Object
+    Set txtStream = fso.CreateTextFile(testFile, True)
+    txtStream.WriteLine "Test"
+    txtStream.Close
+    fso.DeleteFile testFile
+    CanModify = True
+    Exit Function
+ErrHandler:
+    CanModify = False
+End Function
+
+' 15. Получение списка файлов указанного каталога
+Public Function GetFilesInFolder(ByVal folderPath As String) As Variant
+    Dim fso As Object
+    Dim folder As Object
+    Dim file As Object
+    Dim filesList() As String
+    Dim i As Integer
+
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If fso.FolderExists(folderPath) Then
+        Set folder = fso.GetFolder(folderPath)
+        ReDim filesList(1 To folder.files.Count)
+        i = 1
+        For Each file In folder.files
+            filesList(i) = file.Name
+            i = i + 1
+        Next file
+        GetFilesInFolder = filesList
+    Else
+        GetFilesInFolder = Array()
+    End If
+End Function
+
+' 16. Получение списка папок указанного каталога
+Public Function GetFoldersInFolder(ByVal folderPath As String) As Variant
+    Dim fso As Object
+    Dim folder As Object
+    Dim subFolder As Object
+    Dim foldersList() As String
+    Dim i As Integer
+
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If fso.FolderExists(folderPath) Then
+        Set folder = fso.GetFolder(folderPath)
+        ReDim foldersList(1 To folder.SubFolders.Count)
+        i = 1
+        For Each subFolder In folder.SubFolders
+            foldersList(i) = subFolder.Name
+            i = i + 1
+        Next subFolder
+        GetFoldersInFolder = foldersList
+    Else
+        GetFoldersInFolder = Array()
+    End If
+End Function
+
+' 17. Получение списка расширений файлов в указанном каталоге
+Public Function GetFileExtensions(ByVal folderPath As String) As Collection
+    Dim fso As Object
+    Dim folder As Object
+    Dim file As Object
+    Dim colExtensions As New Collection
+    Dim ext As String
+    Dim item As Variant
+    Dim exists As Boolean
+
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If fso.FolderExists(folderPath) Then
+        Set folder = fso.GetFolder(folderPath)
+        For Each file In folder.files
+            ext = fso.GetExtensionName(file.Name)
+            exists = False
+            For Each item In colExtensions
+                If LCase(item) = LCase(ext) Then
+                    exists = True
+                    Exit For
+                End If
+            Next item
+            If Not exists Then
+                colExtensions.Add ext
+            End If
+        Next file
+        Set GetFileExtensions = colExtensions
+    Else
+        Set GetFileExtensions = New Collection
+    End If
+End Function
+
+' 18. Получение размера указанного каталога
+Public Function GetFolderSize(ByVal folderPath As String) As Long
+    Dim fso As Object
+    Dim folder As Object
+
+    Set fso = CreateObject("Scripting.FileSystemObject")
+    If fso.FolderExists(folderPath) Then
+        Set folder = fso.GetFolder(folderPath)
+        GetFolderSize = folder.Size
+    Else
+        GetFolderSize = 0
+    End If
+End Function
+
+' 19. Получение всех свойств указанного каталога
+Public Function GetFolderProperties(ByVal folderPath As String) As Scripting.Dictionary
+    Dim fso As Scripting.FileSystemObject
+    Dim folder As Scripting.folder
+    Dim dictProps As Scripting.Dictionary
+
+    Set fso = New Scripting.FileSystemObject
+    Set dictProps = New Scripting.Dictionary
+
+    If fso.FolderExists(folderPath) Then
+        Set folder = fso.GetFolder(folderPath)
+        With dictProps
+            .Add "Attributes", folder.Attributes
+            .Add "DateCreated", folder.DateCreated
+            .Add "DateLastAccessed", folder.DateLastAccessed
+            .Add "DateLastModified", folder.DateLastModified
+            .Add "Drive", folder.Drive.path
+            .Add "IsRootFolder", folder.IsRootFolder
+            .Add "Name", folder.Name
+            .Add "ParentFolder", folder.ParentFolder.path
+            .Add "Path", folder.path
+            .Add "ShortName", folder.ShortName
+            .Add "ShortPath", folder.ShortPath
+            .Add "Size", folder.Size
+            .Add "Type", folder.Type
+        End With
+        Set GetFolderProperties = dictProps
+    Else
+        Set GetFolderProperties = Nothing
+    End If
+End Function
+
+
+
+Sub TestFolderUtils()
+    ' Пример использования функций из модуля FolderUtils
+    Dim folderPath As String
+    Dim files As Variant
+    Dim folders As Variant
+    Dim extensions As Collection
+    Dim folderSize As Long
+    Dim folderProps As Collection
+    Dim item As Variant
+
+    Set folderProps = GetFolderProperties(folderPath)
+
+    ' 1. Выбор папки
+    folderPath = SelectFolder("Выберите папку для анализа")
+    If folderPath = "" Then
+        MsgBox "Папка не выбрана.", vbExclamation
+        Exit Sub
+    End If
+
+    ' 2. Проверка существования папки
+    If Not FolderExists(folderPath) Then
+        MsgBox "Папка не существует.", vbExclamation
+        Exit Sub
+    End If
+
+    ' 3. Получение списка файлов
+    files = GetFilesInFolder(folderPath)
+    Debug.Print "Файлы в папке " & folderPath & ":"
+    For Each item In files
+        Debug.Print item
+    Next item
+
+    ' 4. Получение списка папок
+    folders = GetFoldersInFolder(folderPath)
+    Debug.Print "Подкаталоги в папке " & folderPath & ":"
+    For Each item In folders
+        Debug.Print item
+    Next item
+
+    ' 5. Получение списка расширений файлов
+    Set extensions = GetFileExtensions(folderPath)
+    Debug.Print "Расширения файлов в папке " & folderPath & ":"
+    For Each item In extensions
+        Debug.Print item
+    Next item
+
+    ' 6. Получение размера папки
+    folderSize = GetFolderSize(folderPath)
+    Debug.Print "Размер папки: " & folderSize & " байт"
+
+    ' 7. Проверка возможности модификации
+    If CanModify(folderPath) Then
+        Debug.Print "Папка доступна для записи."
+    Else
+        Debug.Print "Папка недоступна для записи."
+    End If
+
+    ' 8. Получение свойств папки
+    Set folderProps = GetFolderProperties(folderPath)
+    
+        If Not folderProps Is Nothing Then
+            Debug.Print "Свойства папки:"
+            Dim key As Variant
+            For Each key In folderProps.keys
+                Debug.Print key & ": " & folderProps(key)
+            Next key
+        Else
+            Debug.Print "Папка не найдена."
+        End If
+
+
+    ' 9. Получение имен папок до корня
+    Dim folderNames As Collection
+    Set folderNames = GetFolderNameAndParents(folderPath)
+    Debug.Print "Имена папок от выбранной до корневой:"
+    For Each item In folderNames
+        Debug.Print item
+    Next item
+End Sub

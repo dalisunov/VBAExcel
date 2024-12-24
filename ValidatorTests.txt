@@ -1,0 +1,215 @@
+Attribute VB_Name = "ValidatorTests"
+
+Option Explicit
+
+' ------------------------------------------------------------------
+' # Типы данных для тестов импортируются из ValidationTypes
+' ------------------------------------------------------------------
+
+' ------------------------------------------------------------------
+' # Тестирование VBA компонентов
+' ------------------------------------------------------------------
+Public Sub TestVBAComponentNames()
+    Dim Validator As New DataValidator
+    Dim Results As New CollectionManager
+    Results.CreateCollection "TestResults"
+    
+    ' Корректные имена
+    TestVBAName Validator, Results, "mod_TestModule", True, "Стандартный префикс module"
+    TestVBAName Validator, Results, "cls_TestClass", True, "Стандартный префикс class"
+    TestVBAName Validator, Results, "frm_TestForm", True, "Стандартный префикс form"
+    TestVBAName Validator, Results, "ctl_UserControl", True, "Стандартный префикс control"
+    
+    ' Некорректные имена
+    TestVBAName Validator, Results, "", False, "Пустое имя"
+    TestVBAName Validator, Results, "test_Module", False, "Неверный префикс"
+    TestVBAName Validator, Results, "mod Test", False, "Содержит пробел"
+    TestVBAName Validator, Results, String(32, "a"), False, "Превышение длины"
+    TestVBAName Validator, Results, "mod_Test@Module", False, "Запрещенные символы"
+    
+    ' Пограничные случаи
+    TestVBAName Validator, Results, String(31, "a"), True, "Максимальная допустимая длина"
+    TestVBAName Validator, Results, "mod_1Test", True, "Цифра после префикса"
+    TestVBAName Validator, Results, "mod_Test_1", True, "Цифра в конце"
+    TestVBAName Validator, Results, "mod_", False, "Только префикс"
+    TestVBAName Validator, Results, "mod_Test_", False, "Имя оканчивается на подчеркивание"
+    
+    ' Вывод результатов
+    PrintTestResults Results
+End Sub
+
+' ------------------------------------------------------------------
+' # Тестирование имен листов Excel
+' ------------------------------------------------------------------
+Public Sub TestWorksheetNames()
+    Dim Validator As New DataValidator
+    Dim Results As New Collection
+    
+    ' Корректные имена
+    TestWorksheetName Validator, Results, "Лист1", True, "Стандартное имя на русском"
+    TestWorksheetName Validator, Results, "Sheet1", True, "Стандартное имя на английском"
+    TestWorksheetName Validator, Results, "Test Sheet", True, "Имя с пробелом"
+    TestWorksheetName Validator, Results, "Data_2023", True, "Имя с подчеркиванием и цифрами"
+    
+    ' Некорректные имена
+    TestWorksheetName Validator, Results, "", False, "Пустое имя"
+    TestWorksheetName Validator, Results, String(32, "a"), False, "Превышение длины"
+    TestWorksheetName Validator, Results, "Sheet[1]", False, "Запрещенные символы"
+    TestWorksheetName Validator, Results, "Sheet:1", False, "Запрещенный символ :"
+    
+    ' Пограничные случаи
+    TestWorksheetName Validator, Results, String(31, "a"), True, "Максимальная допустимая длина"
+    TestWorksheetName Validator, Results, "1Sheet", True, "Цифра в начале"
+    TestWorksheetName Validator, Results, "Тест-2023", True, "Дефис в имени"
+    
+    ' Вывод результатов
+    PrintTestResults Results
+End Sub
+
+' ------------------------------------------------------------------
+' # Тестирование имен файлов
+' ------------------------------------------------------------------
+Public Sub TestFileNames()
+    Dim Validator As New DataValidator
+    Dim Results As New Collection
+    
+    ' Корректные имена
+    TestFileName Validator, Results, "Test.xlsx", True, "Стандартное имя файла Excel"
+    TestFileName Validator, Results, "Report 2023.xlsm", True, "Имя с пробелом и годом"
+    TestFileName Validator, Results, "Отчёт_2023.xlsx", True, "Русское имя с подчеркиванием"
+    
+    ' Некорректные имена
+    TestFileName Validator, Results, "", False, "Пустое имя"
+    TestFileName Validator, Results, "Test.doc", False, "Неверное расширение"
+    TestFileName Validator, Results, "Test<>.xlsx", False, "Запрещенные символы"
+    TestFileName Validator, Results, "CON.xlsx", False, "Зарезервированное имя"
+    
+    ' Пограничные случаи
+    TestFileName Validator, Results, "Test.xls", True, "Старое расширение Excel"
+    TestFileName Validator, Results, "Test (2023).xlsx", True, "Имя со скобками"
+    TestFileName Validator, Results, "1.xlsx", True, "Короткое имя"
+    
+    ' Вывод результатов
+    PrintTestResults Results
+End Sub
+
+' ------------------------------------------------------------------
+' # Вспомогательные процедуры для тестирования
+' ------------------------------------------------------------------
+
+' Тестирование имени VBA компонента
+Private Sub TestVBAName(ByVal Validator As DataValidator, ByRef Results As CollectionManager, _
+                       ByVal TestValue As String, ByVal ExpectedResult As Boolean, _
+                       ByVal TestDescription As String)
+    ' Создаем словарь для результата теста
+    Dim DictManager As New DictionaryManager
+    Dim ResultDict As Scripting.Dictionary
+    Set ResultDict = DictManager.CreateDictionary("TestResult")
+    
+    ' Заполняем данные
+    DictManager.AddToDictionary "TestResult", "TestName", "VBA Component: " & TestDescription
+    DictManager.AddToDictionary "TestResult", "Value", TestValue
+    DictManager.AddToDictionary "TestResult", "Expected", ExpectedResult
+    DictManager.AddToDictionary "TestResult", "Actual", Validator.ValidateVBAComponentName(TestValue)
+    
+    If ExpectedResult <> DictManager.GetItem("TestResult", "Actual") Then
+        DictManager.AddToDictionary "TestResult", "ErrorMessage", Validator.GetLastValidationResultAsString()
+    End If
+    
+    ' Добавляем результат в коллекцию результатов
+    Results.AddToCollection "TestResults", ResultDict
+End Sub
+
+' Тестирование имени листа
+Private Sub TestWorksheetName(ByVal Validator As DataValidator, ByRef Results As Collection, _
+                            ByVal TestValue As String, ByVal ExpectedResult As Boolean, _
+                            ByVal TestDescription As String)
+    Dim Result As TestResult
+    
+    With Result
+        .TestName = "Worksheet: " & TestDescription
+        .Value = TestValue
+        .Expected = ExpectedResult
+        .Actual = Validator.ValidateWorksheetName(TestValue)
+        If .Expected <> .Actual Then
+            .ErrorMessage = Validator.GetLastValidationResultAsString()
+        End If
+    End With
+    
+    Results.Add Result
+End Sub
+
+' Тестирование имени файла
+Private Sub TestFileName(ByVal Validator As DataValidator, ByRef Results As Collection, _
+                        ByVal TestValue As String, ByVal ExpectedResult As Boolean, _
+                        ByVal TestDescription As String)
+    Dim Result As TestResult
+    
+    With Result
+        .TestName = "File: " & TestDescription
+        .Value = TestValue
+        .Expected = ExpectedResult
+        .Actual = Validator.ValidateFileName(TestValue)
+        If .Expected <> .Actual Then
+            .ErrorMessage = Validator.GetLastValidationResultAsString()
+        End If
+    End With
+    
+    Results.Add Result
+End Sub
+
+' Вывод результатов тестирования
+Private Sub PrintTestResults(ByVal Results As CollectionManager)
+    Dim ResultDict As Scripting.Dictionary
+    Dim PassedTests As Long
+    Dim TotalTests As Long
+    
+    Debug.Print String(80, "-")
+    Debug.Print "РЕЗУЛЬТАТЫ ТЕСТИРОВАНИЯ"
+    Debug.Print String(80, "-")
+    
+    Dim testResults As Collection
+    Set testResults = Results.GetCollection("TestResults")
+    
+    For Each ResultDict In testResults
+        TotalTests = TotalTests + 1
+        
+        If ResultDict("Expected") = ResultDict("Actual") Then
+            PassedTests = PassedTests + 1
+            Debug.Print "? PASSED: " & ResultDict("TestName")
+            Debug.Print "  Значение: " & ResultDict("Value")
+        Else
+            Debug.Print "? FAILED: " & ResultDict("TestName")
+            Debug.Print "  Значение: " & ResultDict("Value")
+            Debug.Print "  Ожидалось: " & ResultDict("Expected")
+            Debug.Print "  Получено: " & ResultDict("Actual")
+            If ResultDict.exists("ErrorMessage") Then
+                Debug.Print "  Ошибка: " & ResultDict("ErrorMessage")
+            End If
+        End If
+        Debug.Print String(80, "-")
+    Next ResultDict
+    
+    ' Вывод статистики
+    Debug.Print "СТАТИСТИКА:"
+    Debug.Print "Всего тестов: " & TotalTests
+    Debug.Print "Успешных: " & PassedTests
+    Debug.Print "Неуспешных: " & (TotalTests - PassedTests)
+    Debug.Print "Процент успешных: " & Format$(PassedTests / TotalTests * 100, "0.00") & "%"
+    Debug.Print String(80, "-")
+End Sub
+
+' ------------------------------------------------------------------
+' # Запуск всех тестов
+' ------------------------------------------------------------------
+Public Sub RunAllTests()
+    Debug.Print "Начало тестирования - " & Format$(Now, "dd.mm.yyyy hh:mm:ss")
+    Debug.Print String(80, "-")
+    
+    TestVBAComponentNames
+    TestWorksheetNames
+    TestFileNames
+    
+    Debug.Print "Завершение тестирования - " & Format$(Now, "dd.mm.yyyy hh:mm:ss")
+End Sub
+

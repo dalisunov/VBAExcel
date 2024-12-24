@@ -1,0 +1,124 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "DynamicListObjects"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
+' Класс: DynamicListObjects
+Option Explicit
+
+Private Type TListObjectsState
+    Worksheet As Worksheet
+    InternalList As Collection
+    LastUpdate As Date
+    IsInitialized As Boolean
+    IsRefreshing As Boolean
+End Type
+
+Private this As TListObjectsState
+
+' События
+Public Event OnCollectionChanged()
+Public Event OnListObjectAdded(ByVal ListObj As ListObject)
+Public Event OnListObjectRemoved(ByVal tableName As String)
+
+Private Sub Class_Initialize()
+    Set this.InternalList = New Collection
+    this.IsInitialized = False
+End Sub
+
+Public Sub Initialize(ByVal TargetSheet As Worksheet)
+    Set this.Worksheet = TargetSheet
+    this.IsInitialized = True
+    RefreshCollection
+End Sub
+
+Public Sub RefreshCollection()
+    If Not this.IsInitialized Then Exit Sub
+    
+    ' Пытаемся собрать текущие таблицы
+    On Error Resume Next
+    
+    Dim currentObjects As Collection
+    Set currentObjects = New Collection
+    
+    ' Собираем текущие таблицы
+    Dim lo As ListObject
+    For Each lo In this.Worksheet.ListObjects
+        currentObjects.Add lo, lo.Name ' Добавляем с ключом для точной идентификации
+    Next lo
+    
+    On Error GoTo 0
+    
+    ' Если это первое наполнение коллекции
+    If this.InternalList.Count = 0 Then
+        For Each lo In currentObjects
+            RaiseEvent OnListObjectAdded(lo)
+        Next lo
+    Else
+        ' Сравниваем с внутренним списком
+        CompareCollections this.InternalList, currentObjects
+    End If
+    
+    ' Обновляем внутренний список
+    Set this.InternalList = currentObjects
+    this.LastUpdate = Now
+    
+    RaiseEvent OnCollectionChanged
+End Sub
+
+Public Function GetCount() As Long
+    If this.InternalList Is Nothing Then
+        GetCount = 0
+    Else
+        RefreshCollection ' Обязательно обновляем перед получением количества
+        GetCount = this.InternalList.Count
+    End If
+End Function
+
+Private Sub CompareCollections(ByVal oldCollection As Collection, ByVal newCollection As Collection)
+    Dim oldObj As ListObject
+    Dim newObj As ListObject
+    Dim foundInOld As Boolean
+    Dim foundInNew As Boolean
+    
+    ' Ищем удаленные объекты
+    If oldCollection.Count > 0 Then
+        For Each oldObj In oldCollection
+            foundInNew = False
+            For Each newObj In newCollection
+                If oldObj.Name = newObj.Name Then
+                    foundInNew = True
+                    Exit For
+                End If
+            Next newObj
+            If Not foundInNew Then
+                ' Передаем только имя удаленного объекта
+                RaiseEvent OnListObjectRemoved(oldObj.Name)
+            End If
+        Next oldObj
+    End If
+    
+    ' Ищем добавленные объекты
+    If newCollection.Count > 0 Then
+        For Each newObj In newCollection
+            foundInOld = False
+            For Each oldObj In oldCollection
+                If newObj.Name = oldObj.Name Then
+                    foundInOld = True
+                    Exit For
+                End If
+            Next oldObj
+            If Not foundInOld Then
+                RaiseEvent OnListObjectAdded(newObj)
+            End If
+        Next newObj
+    End If
+End Sub
+
+
+
+

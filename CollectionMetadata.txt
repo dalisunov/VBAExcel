@@ -1,0 +1,90 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "CollectionMetadata"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
+Option Explicit
+
+' ------------------------------------------------------------------
+' # Объявление типа данных
+' ------------------------------------------------------------------
+
+Private Type TMetadata
+    Name As String
+    ItemCount As Long
+    LastModified As Date
+    Types() As String 'Добавлен массив типов
+End Type
+
+' ------------------------------------------------------------------
+' # Переменные класса
+' ------------------------------------------------------------------
+
+Private this As TMetadata
+
+' ------------------------------------------------------------------
+' # Объявление событий
+' ------------------------------------------------------------------
+
+Public Event OnNameChanged(ByVal oldName As String, ByVal newName As String)
+Public Event OnItemCountChanged(ByVal oldCount As Long, ByVal newCount As Long)
+Public Event OnLastModifiedChanged(ByVal newDate As Date)
+Public Event OnTypesChanged() ' добавлено событие для изменения типов
+
+
+' ------------------------------------------------------------------
+' # Методы для работы со свойствами метаданных
+' ------------------------------------------------------------------
+
+' # [Property Let name] - Установка имени
+Public Property Let Name(ByVal Value As String)
+    Dim oldName As String
+    oldName = this.Name
+    this.Name = Value
+    RaiseEvent OnNameChanged(oldName, Value)
+End Property
+
+' # [Property Get name] - Получение имени
+Public Property Get Name() As String
+    Name = this.Name
+End Property
+
+' # [Property Let ItemCount] - Установка количества элементов
+Public Property Let ItemCount(ByVal Value As Long)
+    Dim oldCount As Long
+    oldCount = this.ItemCount
+    this.ItemCount = Value
+    RaiseEvent OnItemCountChanged(oldCount, Value)
+End Property
+
+' # [Property Get ItemCount] - Получение количества элементов
+Public Property Get ItemCount() As Long
+    ItemCount = this.ItemCount
+End Property
+
+' # [Property Let LastModified] - Установка даты последнего изменения
+Public Property Let LastModified(ByVal Value As Date)
+    this.LastModified = Value
+    RaiseEvent OnLastModifiedChanged(Value)
+End Property
+
+' # [Property Get LastModified] - Получение даты последнего изменения
+Public Property Get LastModified() As Date
+    LastModified = this.LastModified
+End Property
+
+' # [Property Let Types] - Установка массива типов элементов
+Public Property Let Types(ByRef Value() As String)
+    this.Types = Value
+    RaiseEvent OnTypesChanged 'Вызываем событие об изменении типов
+End Property
+
+
+' # [Property Get Types] - Получение массива типов элементов
+Public Property Get Types() As String()
+    Types = this.Types
+End Property

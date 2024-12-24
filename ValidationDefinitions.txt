@@ -1,0 +1,244 @@
+Attribute VB_Name = "ValidationDefinitions"
+' Component: ValidationDefinitions
+
+Option Explicit
+
+' ------------------------------------------------------------------
+' # Справочники
+' ------------------------------------------------------------------
+Public Enum CharacterEncoding
+    encANSI = 1
+    encUTF8 = 2
+    encUnicode = 3
+End Enum
+
+' ------------------------------------------------------------------
+' # Строки для валидации
+' ------------------------------------------------------------------
+' ANSI символы (Windows-1251)
+Public Const CHARS_LATIN_ANSI As String = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+Public Const CHARS_CYRILLIC_ANSI As String = "абвгдеёжзийклмнопрстуфхцчшщъыьэюяАБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ"
+Public Const CHARS_NUMBERS_ANSI As String = "0123456789"
+Public Const CHARS_SPECIAL_ANSI As String = "!@#$%^&*()_+-=[]{}|;:,.<>?/~`"
+Public Const CHARS_SPACE_ANSI As String = " " & vbTab
+
+' UTF-8 специальные символы
+Public Const CHARS_SPECIAL_UTF8 As String = "«»“”§±?µcy"
+
+' ------------------------------------------------------------------
+' # Требования к именам VBA компонентов
+' ------------------------------------------------------------------
+Public Const REQ_VB_COMPONENT_MAXLENGTH As Long = 31
+Public Const REQ_VB_COMPONENT_FIRSTCHAR As String = CHARS_LATIN_ANSI
+Public Const REQ_VB_COMPONENT_OTHERCHARS As String = CHARS_LATIN_ANSI & CHARS_NUMBERS_ANSI & "_"
+Public Const REQ_VB_COMPONENT_FORBIDDEN As String = " "
+Public Const REQ_VB_COMPONENT_PREFIX As String = "mod,cls,frm,ctl"
+
+' Требования к UserForm Controls
+Public Const REQ_VB_CONTROL_MAXLENGTH As Long = 40
+Public Const REQ_VB_CONTROL_FIRSTCHAR As String = CHARS_LATIN_ANSI
+Public Const REQ_VB_CONTROL_OTHERCHARS As String = CHARS_LATIN_ANSI & CHARS_NUMBERS_ANSI & "_"
+Public Const REQ_VB_CONTROL_FORBIDDEN As String = " "
+Public Const REQ_VB_CONTROL_PREFIX As String = "txt,cmd,lbl,frm,chk,opt,lst,cbo"
+
+' ------------------------------------------------------------------
+' # Требования к именам объектов Excel
+' ------------------------------------------------------------------
+' Workbook
+Public Const REQ_WB_MAXLENGTH As Long = 218 ' 255 - ограничение длины пути
+Public Const REQ_WB_FIRSTCHAR As String = CHARS_LATIN_ANSI & CHARS_CYRILLIC_ANSI & CHARS_NUMBERS_ANSI
+Public Const REQ_WB_OTHERCHARS As String = CHARS_LATIN_ANSI & CHARS_CYRILLIC_ANSI & CHARS_NUMBERS_ANSI & " _-.()"
+Public Const REQ_WB_FORBIDDEN As String = "\/:*?""<>|"
+Public Const REQ_WB_EXTENSIONS As String = ".xlsx,.xlsm,.xlsb,.xls"
+
+' Worksheet
+Public Const REQ_WS_MAXLENGTH As Long = 31
+Public Const REQ_WS_FIRSTCHAR As String = CHARS_LATIN_ANSI & CHARS_CYRILLIC_ANSI & CHARS_NUMBERS_ANSI
+Public Const REQ_WS_OTHERCHARS As String = CHARS_LATIN_ANSI & CHARS_CYRILLIC_ANSI & CHARS_NUMBERS_ANSI & " _-()"
+Public Const REQ_WS_FORBIDDEN As String = "\/:*?[]"
+
+' ListObjects (Tables)
+Public Const REQ_TABLE_MAXLENGTH As Long = 255
+Public Const REQ_TABLE_FIRSTCHAR As String = CHARS_LATIN_ANSI & CHARS_CYRILLIC_ANSI
+Public Const REQ_TABLE_OTHERCHARS As String = CHARS_LATIN_ANSI & CHARS_CYRILLIC_ANSI & CHARS_NUMBERS_ANSI & "_"
+Public Const REQ_TABLE_FORBIDDEN As String = " "
+
+' ListColumns (Table Columns)
+Public Const REQ_COLUMN_MAXLENGTH As Long = 255
+Public Const REQ_COLUMN_FIRSTCHAR As String = CHARS_LATIN_ANSI & CHARS_CYRILLIC_ANSI
+Public Const REQ_COLUMN_OTHERCHARS As String = CHARS_LATIN_ANSI & CHARS_CYRILLIC_ANSI & CHARS_NUMBERS_ANSI & " _"
+Public Const REQ_COLUMN_FORBIDDEN As String = "[]\/:"
+
+' Shapes and Charts
+Public Const REQ_SHAPE_MAXLENGTH As Long = 255
+Public Const REQ_SHAPE_FIRSTCHAR As String = CHARS_LATIN_ANSI & CHARS_CYRILLIC_ANSI & CHARS_NUMBERS_ANSI
+Public Const REQ_SHAPE_OTHERCHARS As String = CHARS_LATIN_ANSI & CHARS_CYRILLIC_ANSI & CHARS_NUMBERS_ANSI & " _-()"
+Public Const REQ_SHAPE_FORBIDDEN As String = "\/:"
+
+' Names (Named Ranges)
+Public Const REQ_NAME_MAXLENGTH As Long = 255
+Public Const REQ_NAME_FIRSTCHAR As String = CHARS_LATIN_ANSI
+Public Const REQ_NAME_OTHERCHARS As String = CHARS_LATIN_ANSI & CHARS_NUMBERS_ANSI & "_"
+Public Const REQ_NAME_FORBIDDEN As String = " .-+*/\[](){}"
+
+' ------------------------------------------------------------------
+' # Требования к путям и файлам
+' ------------------------------------------------------------------
+' Path
+Public Const REQ_PATH_MAXLENGTH As Long = 260
+Public Const REQ_PATH_FORBIDDEN As String = "<>:""/\|?*"
+Public Const REQ_PATH_RESERVED As String = "CON,PRN,AUX,NUL,COM1,COM2,COM3,COM4,COM5,COM6,COM7,COM8,COM9," & _
+                                         "LPT1,LPT2,LPT3,LPT4,LPT5,LPT6,LPT7,LPT8,LPT9"
+
+' File
+Public Const REQ_FILE_MAXLENGTH As Long = 255
+Public Const REQ_FILE_FIRSTCHAR As String = CHARS_LATIN_ANSI & CHARS_CYRILLIC_ANSI & CHARS_NUMBERS_ANSI
+Public Const REQ_FILE_OTHERCHARS As String = CHARS_LATIN_ANSI & CHARS_CYRILLIC_ANSI & CHARS_NUMBERS_ANSI & " _-.()"
+Public Const REQ_FILE_FORBIDDEN As String = "\/:*?""<>|"
+
+' ------------------------------------------------------------------
+' # Требования к числовым данным
+' ------------------------------------------------------------------
+' Integer
+Public Const REQ_INT_MIN As Long = -2147483648#
+Public Const REQ_INT_MAX As Long = 2147483647#
+Public Const REQ_INT_FORBIDDEN As String = "."
+
+' Double
+Public Const REQ_DBL_MIN As Double = -1.79769313486231E+308
+Public Const REQ_DBL_MAX As Double = 1.79769313486231E+308
+Public Const REQ_DBL_DECIMALS As Integer = 15
+Public Const REQ_DBL_DECIMAL_SEP As String = "."
+
+' Date
+Public Const REQ_DATE_MIN As Date = #1/1/1900#
+Public Const REQ_DATE_MAX As Date = #12/31/9999#
+Public Const REQ_DATE_FORMAT As String = "dd.mm.yyyy"
+
+' Time
+Public Const REQ_TIME_FORMAT As String = "hh:mm:ss"
+Public Const REQ_TIME_SEP As String = ":"
+
+' ------------------------------------------------------------------
+' # Вспомогательные функции для валидации
+' ------------------------------------------------------------------
+
+Public Function IsValidFirstChar(ByVal Value As String, ByVal AllowedChars As String) As Boolean
+    If Len(Value) = 0 Then Exit Function
+    IsValidFirstChar = InStr(1, AllowedChars, Left$(Value, 1)) > 0
+End Function
+
+Public Function ContainsOnlyAllowedChars(ByVal Value As String, ByVal AllowedChars As String) As Boolean
+    Dim i As Long
+    For i = 1 To Len(Value)
+        If InStr(1, AllowedChars, Mid$(Value, i, 1)) = 0 Then
+            Exit Function
+        End If
+    Next i
+    ContainsOnlyAllowedChars = True
+End Function
+
+Public Function ContainsForbiddenChars(ByVal Value As String, ByVal ForbiddenChars As String) As Boolean
+    Dim i As Long
+    For i = 1 To Len(Value)
+        If InStr(1, ForbiddenChars, Mid$(Value, i, 1)) > 0 Then
+            ContainsForbiddenChars = True
+            Exit Function
+        End If
+    Next i
+End Function
+
+Public Function IsReservedName(ByVal Value As String) As Boolean
+    IsReservedName = InStr(1, REQ_PATH_RESERVED & ",", UCase$(Value) & ",") > 0
+End Function
+
+' ------------------------------------------------------------------
+' # Конвертация кодировок
+' ------------------------------------------------------------------
+
+Public Function ConvertToEncoding(ByVal text As String, ByVal SourceEncoding As CharacterEncoding, _
+                                ByVal TargetEncoding As CharacterEncoding) As String
+    On Error GoTo ErrorHandler
+    
+    If SourceEncoding = TargetEncoding Then
+        ConvertToEncoding = text
+        Exit Function
+    End If
+    
+    Dim stream As Object
+    Set stream = CreateObject("ADODB.Stream")
+    
+    ' Установка начальной кодировки
+    With stream
+        .Type = 2 'adTypeText
+        .Charset = GetCharset(SourceEncoding)
+        .Open
+        .WriteText text
+        .Position = 0
+        .Charset = GetCharset(TargetEncoding)
+        ConvertToEncoding = .ReadText
+        .Close
+    End With
+    
+    Exit Function
+    
+ErrorHandler:
+    ConvertToEncoding = text ' Возврат оригинального текста в случае ошибки
+End Function
+
+Private Function GetCharset(ByVal encoding As CharacterEncoding) As String
+    Select Case encoding
+        Case CharacterEncoding.encANSI
+            GetCharset = "windows-1251"
+        Case CharacterEncoding.encUTF8
+            GetCharset = "utf-8"
+        Case CharacterEncoding.encUnicode
+            GetCharset = "unicode"
+        Case Else
+            GetCharset = "windows-1251"
+    End Select
+End Function
+
+Private Function HasUTF8BOM(ByVal text As String) As Boolean
+    If Len(text) < 3 Then Exit Function
+    
+    Dim bytes() As Byte
+    bytes = StrConv(text, vbFromUnicode)
+    
+    HasUTF8BOM = (bytes(0) = &HEF) And (bytes(1) = &HBB) And (bytes(2) = &HBF)
+End Function
+
+Private Function IsValidUTF8(ByVal text As String) As Boolean
+    Dim bytes() As Byte
+    bytes = StrConv(text, vbFromUnicode)
+    
+    Dim i As Long
+    i = 0
+    While i < LenB(text)
+        Select Case bytes(i)
+            Case 0 To 127  ' ASCII
+                i = i + 1
+            Case 192 To 223  ' 2-byte sequence
+                If i + 1 >= LenB(text) Then Exit Function
+                If (bytes(i + 1) And &HC0) <> &H80 Then Exit Function
+                i = i + 2
+            Case 224 To 239  ' 3-byte sequence
+                If i + 2 >= LenB(text) Then Exit Function
+                If (bytes(i + 1) And &HC0) <> &H80 Then Exit Function
+                If (bytes(i + 2) And &HC0) <> &H80 Then Exit Function
+                i = i + 3
+            Case 240 To 247  ' 4-byte sequence
+                If i + 3 >= LenB(text) Then Exit Function
+                If (bytes(i + 1) And &HC0) <> &H80 Then Exit Function
+                If (bytes(i + 2) And &HC0) <> &H80 Then Exit Function
+                If (bytes(i + 3) And &HC0) <> &H80 Then Exit Function
+                i = i + 4
+            Case Else
+                Exit Function
+        End Select
+    Wend
+    
+    IsValidUTF8 = True
+End Function
+
+

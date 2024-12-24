@@ -1,0 +1,321 @@
+VERSION 1.0 CLASS
+BEGIN
+  MultiUse = -1  'True
+END
+Attribute VB_Name = "DataValidator"
+Attribute VB_GlobalNameSpace = False
+Attribute VB_Creatable = False
+Attribute VB_PredeclaredId = False
+Attribute VB_Exposed = False
+Option Explicit
+
+' ------------------------------------------------------------------
+' # Структуры данных для результатов валидации
+' ------------------------------------------------------------------
+
+'Public Type ValidationResult
+'    IsValid As Boolean
+'    ErrorCode As Long
+'    ErrorMessage As String
+'    Details As String
+'    ValidationTime As Date
+'End Type
+
+' ------------------------------------------------------------------
+' # Класс DataValidator
+' ------------------------------------------------------------------
+
+Private Type ValidatorState
+    BaseManager As BaseManager
+    LastResult As ValidationResult
+    ValidationRules As Collection
+    IsInitialized As Boolean
+End Type
+
+Private this As ValidatorState
+
+' ------------------------------------------------------------------
+' # События
+' ------------------------------------------------------------------
+
+Public Event OnValidationComplete(ByVal Result As Boolean, ByVal ErrorMessage As String)
+Public Event OnRuleAdded(ByVal RuleName As String)
+Public Event OnRuleFailed(ByVal RuleName As String, ByVal Value As Variant)
+
+' ------------------------------------------------------------------
+' # Инициализация класса
+' ------------------------------------------------------------------
+
+Private Sub Class_Initialize()
+    Set this.BaseManager = New BaseManager
+    Set this.ValidationRules = New Collection
+    Set this.LastResult = New ValidationResult
+    this.IsInitialized = False
+End Sub
+
+Private Sub Class_Terminate()
+    Set this.BaseManager = Nothing
+    Set this.ValidationRules = Nothing
+    Set this.LastResult = Nothing
+End Sub
+
+' ------------------------------------------------------------------
+' # Валидация названия VBA компонента
+' ------------------------------------------------------------------
+
+Public Function ValidateVBAComponentName(ByVal Value As String) As Boolean
+    If Not this.IsInitialized Then InitializeValidator
+    
+    ClearLastResult
+    
+    ' Валидация основных требований
+    If Not ValidateBasicRequirements(Value, REQ_VB_COMPONENT_MAXLENGTH) Then
+        Exit Function
+    End If
+    
+    ' Проверка первого символа
+    If Not IsValidFirstChar(Value, REQ_VB_COMPONENT_FIRSTCHAR) Then
+        SetValidationError 1001, "Недопустимый первый символ", _
+                              "Только разрешенные символы: " & REQ_VB_COMPONENT_FIRSTCHAR
+        Exit Function
+    End If
+    
+    ' Проверка оставшихся символов
+    If Not ContainsOnlyAllowedChars(Value, REQ_VB_COMPONENT_OTHERCHARS) Then
+        SetValidationError 1002, "Недопустимые символы в имени", _
+                              "Разрешенные символы: " & REQ_VB_COMPONENT_OTHERCHARS
+        Exit Function
+    End If
+    
+    ' Проверка на запрещенные символы
+    If ContainsForbiddenChars(Value, REQ_VB_COMPONENT_FORBIDDEN) Then
+        SetValidationError 1003, "Запрещенные символы в имени", _
+                              "Запрещенные символы: " & REQ_VB_COMPONENT_FORBIDDEN
+        Exit Function
+    End If
+    
+    ' Проверка префикса
+    If Not ValidatePrefix(Value, REQ_VB_COMPONENT_PREFIX) Then
+        SetValidationError 1004, "Неверный префикс", _
+                              "Разрешенные префиксы: " & REQ_VB_COMPONENT_PREFIX
+        Exit Function
+    End If
+    
+    ' Успешная валидация
+    SetValidationSuccess "Имя компонента VBA валидно"
+    ValidateVBAComponentName = True
+End Function
+
+' ------------------------------------------------------------------
+' # Валидация названия листа Excel
+' ------------------------------------------------------------------
+
+Public Function ValidateWorksheetName(ByVal Value As String) As Boolean
+    If Not this.IsInitialized Then InitializeValidator
+    
+    ClearLastResult
+    
+    ' Валидация основных требований
+    If Not ValidateBasicRequirements(Value, REQ_WS_MAXLENGTH) Then
+        Exit Function
+    End If
+    
+    ' Проверка первого символа
+    If Not IsValidFirstChar(Value, REQ_WS_FIRSTCHAR) Then
+        SetValidationError 2001, "Недопустимый первый символ", _
+                              "Разрешенные символы: " & REQ_WS_FIRSTCHAR
+        Exit Function
+    End If
+    
+    ' Проверка оставшихся символов
+    If Not ContainsOnlyAllowedChars(Value, REQ_WS_OTHERCHARS) Then
+        SetValidationError 2002, "Недопустимые символы в имени", _
+                              "Разрешенные символы: " & REQ_WS_OTHERCHARS
+        Exit Function
+    End If
+    
+    ' Проверка на запрещенные символы
+    If ContainsForbiddenChars(Value, REQ_WS_FORBIDDEN) Then
+        SetValidationError 2003, "Запрещенные символы в имени", _
+                              "Запрещенные символы: " & REQ_WS_FORBIDDEN
+        Exit Function
+    End If
+    
+    ' Успешная валидация
+    SetValidationSuccess "Имя листа Excel валидно"
+    ValidateWorksheetName = True
+End Function
+
+' ------------------------------------------------------------------
+' # Валидация имени файла
+' ------------------------------------------------------------------
+
+Public Function ValidateFileName(ByVal Value As String, Optional ByVal CheckExtension As Boolean = True) As Boolean
+    If Not this.IsInitialized Then InitializeValidator
+    
+    ClearLastResult
+    
+    ' Валидация основных требований
+    If Not ValidateBasicRequirements(Value, REQ_FILE_MAXLENGTH) Then
+        Exit Function
+    End If
+    
+    ' Проверка первого символа
+    If Not IsValidFirstChar(Value, REQ_FILE_FIRSTCHAR) Then
+        SetValidationError 3001, "Недопустимый первый символ", _
+                              "Разрешенные символы: " & REQ_FILE_FIRSTCHAR
+        Exit Function
+    End If
+    
+    ' Проверка оставшихся символов
+    If Not ContainsOnlyAllowedChars(Value, REQ_FILE_OTHERCHARS) Then
+        SetValidationError 3002, "Недопустимые символы в имени файла", _
+                              "Разрешенные символы: " & REQ_FILE_OTHERCHARS
+        Exit Function
+    End If
+    
+    ' Проверка на запрещенные символы
+    If ContainsForbiddenChars(Value, REQ_FILE_FORBIDDEN) Then
+        SetValidationError 3003, "Запрещенные символы в имени файла", _
+                              "Запрещенные символы: " & REQ_FILE_FORBIDDEN
+        Exit Function
+    End If
+    
+    ' Проверка зарезервированных имен
+    If IsReservedName(Value) Then
+        SetValidationError 3004, "Зарезервированное имя", _
+                              "Имя '" & Value & "' зарезервировано в Windows"
+        Exit Function
+    End If
+    
+    ' Проверка расширения файла
+    If CheckExtension Then
+        Dim FileExt As String
+        FileExt = "." & GetFileExtension(Value)
+        
+        If InStr(1, REQ_WB_EXTENSIONS, FileExt) = 0 Then
+            SetValidationError 3005, "Недопустимое расширение файла", _
+                                  "Разрешенные расширения: " & REQ_WB_EXTENSIONS
+            Exit Function
+        End If
+    End If
+    
+    ' Успешная валидация
+    SetValidationSuccess "Имя файла валидно"
+    ValidateFileName = True
+End Function
+
+' ------------------------------------------------------------------
+' # Вспомогательные методы
+' ------------------------------------------------------------------
+
+Private Sub InitializeValidator()
+    this.BaseManager.DebugMode = True
+    this.IsInitialized = True
+End Sub
+
+Private Sub ClearLastResult()
+    With this.LastResult
+        .isValid = False
+        .ErrorCode = 0
+        .ErrorMessage = ""
+        .Details = ""
+        .ValidationTime = Now
+    End With
+End Sub
+
+Private Sub SetValidationError(ByVal ErrorCode As Long, ByVal ErrorMessage As String, _
+                              Optional ByVal Details As String = "")
+    With this.LastResult
+        .isValid = False
+        .ErrorCode = ErrorCode
+        .ErrorMessage = ErrorMessage
+        .Details = Details
+        .ValidationTime = Now
+    End With
+    
+    ' Логирование ошибки через BaseManager
+    this.BaseManager.LogError ErrorMessage & IIf(Len(Details) > 0, " - " & Details, "")
+    
+    ' Генерация события об ошибке валидации
+    RaiseEvent OnValidationComplete(False, ErrorMessage)
+End Sub
+
+Private Sub SetValidationSuccess(Optional ByVal Details As String = "")
+    With this.LastResult
+        .isValid = True
+        .ErrorCode = 0
+        .ErrorMessage = "Валидация прошла успешно"
+        .Details = Details
+        .ValidationTime = Now
+    End With
+    
+    ' Логирование успешной валидации через BaseManager
+    this.BaseManager.LogInfo "Валидация прошла успешно" & IIf(Len(Details) > 0, " - " & Details, "")
+    
+    ' Генерация события о успешной валидации
+    RaiseEvent OnValidationComplete(True, "")
+End Sub
+
+Private Function ValidateBasicRequirements(ByVal Value As String, ByVal MaxLength As Long) As Boolean
+    ' Проверка на пустую строку
+    If Len(Trim(Value)) = 0 Then
+        SetValidationError 1000, "Пустое значение", "Значение не должно быть пустым"
+        Exit Function
+    End If
+    
+    ' Проверка длины строки
+    If Len(Value) > MaxLength Then
+        SetValidationError 1001, "Превышена максимальная длина", _
+                              "Максимальная длина: " & MaxLength & ", Текущая длина: " & Len(Value)
+        Exit Function
+    End If
+    
+    ValidateBasicRequirements = True
+End Function
+
+Private Function ValidatePrefix(ByVal Value As String, ByVal AllowedPrefixes As String) As Boolean
+    Dim Prefixes() As String
+    Prefixes = Split(AllowedPrefixes, ",")
+    
+    Dim Prefix As Variant
+    For Each Prefix In Prefixes
+        If Left$(Value, Len(Prefix)) = Prefix Then
+            ValidatePrefix = True
+            Exit Function
+        End If
+    Next Prefix
+    
+    ValidatePrefix = False
+End Function
+
+Private Function GetFileExtension(ByVal fileName As String) As String
+    Dim LastDot As Long
+    LastDot = InStrRev(fileName, ".")
+    
+    If LastDot > 0 Then
+        GetFileExtension = Mid$(fileName, LastDot + 1)
+    End If
+End Function
+
+' ------------------------------------------------------------------
+' # Свойства и методы для получения результатов валидации
+' ------------------------------------------------------------------
+
+' Получение последнего результата валидации
+Public Property Get LastValidationResult() As ValidationResult
+    LastValidationResult = this.LastResult
+End Property
+
+' Получение последнего результата валидации в виде строки
+Public Function GetLastValidationResultAsString() As String
+    With this.LastResult
+        GetLastValidationResultAsString = _
+            "Результат: " & IIf(.isValid, "Успешно", "Неуспешно") & vbCrLf & _
+            "Код ошибки: " & .ErrorCode & vbCrLf & _
+            "Сообщение: " & .ErrorMessage & vbCrLf & _
+            "Детали: " & .Details & vbCrLf & _
+            "Время валидации: " & Format$(.ValidationTime, "dd.mm.yyyy hh:mm:ss")
+    End With
+End Function
+
